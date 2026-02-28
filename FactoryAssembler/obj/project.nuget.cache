@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "xcix28KsVKs=",
+  "success": true,
+  "projectFilePath": "/home/lolo/developer/csharp-projects/FactoryAssembler/FactoryAssembler/FactoryAssembler.csproj",
+  "expectedPackageFiles": [
+    "/home/lolo/.nuget/packages/raylib-cs/7.0.2/raylib-cs.7.0.2.nupkg.sha512"
+  ],
+  "logs": []
+}
