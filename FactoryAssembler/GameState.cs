@@ -38,8 +38,8 @@ public static class GameState
     // --- ÚJ: KÜLDETÉS RENDSZER ---
     public static List<Quest> Quests = new List<Quest>()
     {
-        new Quest { Title = "First Steps", TargetItem = "Stone", TargetAmount = 10, RewardCredits = 100 },
-        new Quest { Title = "Fuel the Fire", TargetItem = "Coal", TargetAmount = 25, RewardCredits = 150 },
+        new Quest { Title = "First Steps", TargetItem = "Coal", TargetAmount = 10, RewardCredits = 100 },
+        new Quest { Title = "Fuel the Fire", TargetItem = "Stone", TargetAmount = 25, RewardCredits = 150 },
         new Quest { Title = "Iron Age", TargetItem = "Iron Ore", TargetAmount = 20, RewardCredits = 300 }
     };
     public static int CurrentQuestIndex = 0;

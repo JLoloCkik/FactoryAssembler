@@ -207,4 +207,72 @@ public class VirtualMachine
 
         throw new Exception($"Invalid parameter: {param}");
     }
+    // --- ÚJ: FELADAT TESZTELÉSE ÉS VALIDÁLÁSA ---
+    public bool RunTest(List<int> expectedInputs, List<int> expectedOutputs, out string failReason)
+    {
+        // Mentsük el a jelenlegi állapotot (mert ez csak teszt)
+        int savedIP = IP;
+        var savedRegisters = new Dictionary<string, int>(Registers);
+        
+        // Reseteljük a teszthez
+        Reset();
+        
+        // Feltöltjük a teszt bemenettel
+        foreach (var val in expectedInputs) InputBuffer.Enqueue(val);
+        
+        int maxSteps = 1000; // Végtelen ciklus elleni védelem
+        int steps = 0;
+        
+        // Futtatjuk, amíg meg nem kapjuk a várt számú kimenetet, vagy el nem fogy a lépés
+        while (OutputBuffer.Count < expectedOutputs.Count && steps < maxSteps)
+        {
+            if (IsHalted) break;
+            
+            // Ha vár bemenetre, de már nincs mit beolvasni, és még nincs kész
+            if (IsWaiting && InputBuffer.Count == 0) break; 
+            
+            Step();
+            steps++;
+        }
+
+        bool success = true;
+        failReason = "";
+
+        // Eredmények ellenőrzése
+        if (OutputBuffer.Count < expectedOutputs.Count)
+        {
+            success = false;
+            failReason = $"Not enough outputs produced.\nProduced: {OutputBuffer.Count}, Expected: {expectedOutputs.Count}";
+        }
+        else
+        {
+            int i = 0;
+            foreach (var outVal in OutputBuffer)
+            {
+                if (i >= expectedOutputs.Count) break; // Többet adott ki, mint kellene (ez lehet hiba is, most elnézzük)
+                
+                if (outVal != expectedOutputs[i])
+                {
+                    success = false;
+                    failReason = $"Output mismatch at index {i}.\nGot: {outVal}, Expected: {expectedOutputs[i]}";
+                    break;
+                }
+                i++;
+            }
+        }
+
+        if (IsHalted && !string.IsNullOrEmpty(LastError))
+        {
+            success = false;
+            failReason = $"Runtime Error: {LastError}";
+        }
+
+        // Állapot visszaállítása (hogy a játékban ott folytassa, ahol abbahagyta)
+        IP = savedIP;
+        Registers = savedRegisters;
+        OutputBuffer.Clear();
+        InputBuffer.Clear();
+
+        return success;
+    }
 }
