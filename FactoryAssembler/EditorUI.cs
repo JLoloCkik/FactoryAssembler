@@ -7,23 +7,36 @@ namespace FactoryAssembler;
 public class EditorUI
 {
     public bool IsVisible { get; private set; } = false;
+    public Dictionary<string, int> GlobalUnlocks { get; set; }
+
     private Card? CurrentCard;
     private string CodeBuffer = "";
+    
+    // Állapotkezelés
+    enum EditorState { LevelSelect, Solving }
+    private EditorState CurrentState = EditorState.LevelSelect;
+    
+    private Puzzle? CurrentPuzzle;
+    private int TargetLevel = 1; // Melyik szintet próbáljuk feloldani?
+    private string TestResult = ""; // "SUCCESS" vagy hibaüzenet
+    private Color ResultColor = Color.Gray;
+
+    // Kurzor villogás
     private float cursorTimer = 0;
     private bool cursorVisible = true;
-    
-    // Hivatkozás a globális feloldásokra (Program.cs-ből kapjuk)
-    public Dictionary<string, int> GlobalUnlocks { get; set; }
 
     public void Open(Card card)
     {
         CurrentCard = card;
         CodeBuffer = string.Join("\n", card.VM.Instructions);
         IsVisible = true;
+        CurrentState = EditorState.LevelSelect; // Mindig a választóval nyitunk
+        TestResult = "";
     }
 
     public void Close()
     {
+        // Csak akkor mentjük a kódot a gépbe, ha bezárjuk
         if (CurrentCard != null) CurrentCard.VM.LoadCode(CodeBuffer);
         IsVisible = false;
         CurrentCard = null;
@@ -33,7 +46,9 @@ public class EditorUI
     {
         if (!IsVisible || CurrentCard == null) return;
 
-        // 1. BILLENTYŰZET (Csak gépelés a bal oldalra)
+        // --- BILLENTYŰZET (KÓD SZERKESZTÉS) ---
+        // Csak akkor engedünk írni, ha Solving módban vagyunk, VAGY ha a kódot nézzük
+        // De egyszerűsítsünk: Mindig lehet írni.
         int key = Raylib.GetCharPressed();
         while (key > 0)
         {
@@ -44,46 +59,97 @@ public class EditorUI
         if (Raylib.IsKeyPressed(KeyboardKey.Enter)) CodeBuffer += "\n";
         if (Raylib.IsKeyPressed(KeyboardKey.Escape)) Close();
 
-        // 2. EGÉR KATTINTÁSOK A JOBB OLDALI GOMBOKRA
+        // --- EGÉR KEZELÉS ---
         if (Raylib.IsMouseButtonPressed(MouseButton.Left))
         {
             Vector2 mouse = Raylib.GetMousePosition();
-            int screenWidth = Raylib.GetScreenWidth();
-            int screenHeight = Raylib.GetScreenHeight();
-            int panelX = screenWidth / 2; // Jobb oldal kezdete
-            
-            int currentMaxUnlocked = GlobalUnlocks.ContainsKey(CurrentCard.Name) ? GlobalUnlocks[CurrentCard.Name] : 0;
+            int screenW = Raylib.GetScreenWidth();
+            int midX = screenW / 2;
 
-            // Gombok pozíciói (ugyanaz, mint a Draw-ban)
-            Rectangle btnEasy   = new Rectangle(panelX + 50, 150, 300, 60);
-            Rectangle btnNormal = new Rectangle(panelX + 50, 300, 300, 60);
-            Rectangle btnHard   = new Rectangle(panelX + 50, 450, 300, 60);
-
-            // EASY GOMB KATTINTÁS
-            if (Raylib.CheckCollisionPointRec(mouse, btnEasy))
+            if (CurrentState == EditorState.LevelSelect)
             {
-                if (currentMaxUnlocked < 1) GlobalUnlocks[CurrentCard.Name] = 1; // Feloldás
-                CurrentCard.CurrentMultiplier = 1; // Kiválasztás
+                HandleLevelSelectClicks(mouse, midX);
             }
-            // NORMAL GOMB KATTINTÁS
-            else if (Raylib.CheckCollisionPointRec(mouse, btnNormal))
+            else if (CurrentState == EditorState.Solving)
             {
-                if (currentMaxUnlocked >= 1) // Csak ha az előző megvan
-                {
-                    if (currentMaxUnlocked < 2) GlobalUnlocks[CurrentCard.Name] = 2;
-                    CurrentCard.CurrentMultiplier = 2;
-                }
-            }
-            // HARD GOMB KATTINTÁS
-            else if (Raylib.CheckCollisionPointRec(mouse, btnHard))
-            {
-                if (currentMaxUnlocked >= 2) 
-                {
-                    if (currentMaxUnlocked < 4) GlobalUnlocks[CurrentCard.Name] = 4;
-                    CurrentCard.CurrentMultiplier = 4;
-                }
+                HandleSolvingClicks(mouse, midX);
             }
         }
+    }
+
+    private void HandleLevelSelectClicks(Vector2 mouse, int startX)
+    {
+        int unlocked = GlobalUnlocks.ContainsKey(CurrentCard.Name) ? GlobalUnlocks[CurrentCard.Name] : 0;
+        
+        // Gombok: Easy, Normal, Hard
+        if (CheckBtn(mouse, startX + 50, 150)) SelectLevel(1, unlocked);
+        if (CheckBtn(mouse, startX + 50, 300)) SelectLevel(2, unlocked);
+        if (CheckBtn(mouse, startX + 50, 450)) SelectLevel(4, unlocked);
+    }
+
+    private void SelectLevel(int level, int unlocked)
+    {
+        // Csak akkor engedjük, ha az előző szint megvan (kivéve Easy)
+        bool canTry = level == 1 || unlocked >= (level == 4 ? 2 : 1);
+        
+        if (canTry)
+        {
+            // Megkeressük a puzzle-t az adatbázisból
+            string key = $"{CurrentCard.Name}_{level}";
+            
+            // Ha nincs ilyen puzzle (pl. nem írtuk meg), akkor alapértelmezetten feloldjuk
+            if (!PuzzleDatabase.Puzzles.ContainsKey(key))
+            {
+                // Fallback: Ha nincs puzzle, csak aktiváljuk
+                if (unlocked < level) GlobalUnlocks[CurrentCard.Name] = level;
+                CurrentCard.CurrentMultiplier = level;
+                Close();
+                return;
+            }
+
+            CurrentPuzzle = PuzzleDatabase.Puzzles[key];
+            TargetLevel = level;
+            CurrentState = EditorState.Solving;
+            TestResult = "Press RUN TEST to verify code.";
+            ResultColor = Color.Gray;
+        }
+    }
+
+    private void HandleSolvingClicks(Vector2 mouse, int startX)
+    {
+        // "RUN TEST" gomb
+        Rectangle btnRun = new Rectangle(startX + 50, 400, 200, 50);
+        if (Raylib.CheckCollisionPointRec(mouse, btnRun))
+        {
+            string result = PuzzleDatabase.RunTests(CodeBuffer, CurrentPuzzle);
+            if (result == "SUCCESS")
+            {
+                TestResult = "SUCCESS! Level Unlocked.";
+                ResultColor = Color.Green;
+                
+                // FELOLDÁS MENTÉSE!
+                int currentMax = GlobalUnlocks.ContainsKey(CurrentCard.Name) ? GlobalUnlocks[CurrentCard.Name] : 0;
+                if (currentMax < TargetLevel) GlobalUnlocks[CurrentCard.Name] = TargetLevel;
+                CurrentCard.CurrentMultiplier = TargetLevel;
+            }
+            else
+            {
+                TestResult = result;
+                ResultColor = Color.Red;
+            }
+        }
+
+        // "BACK" gomb
+        Rectangle btnBack = new Rectangle(startX + 270, 400, 150, 50);
+        if (Raylib.CheckCollisionPointRec(mouse, btnBack))
+        {
+            CurrentState = EditorState.LevelSelect;
+        }
+    }
+
+    private bool CheckBtn(Vector2 mouse, int x, int y)
+    {
+        return Raylib.CheckCollisionPointRec(mouse, new Rectangle(x, y, 500, 100));
     }
 
     public void Draw(int screenWidth, int screenHeight)
@@ -93,65 +159,108 @@ public class EditorUI
         Raylib.DrawRectangle(0, 0, screenWidth, screenHeight, new Color(0, 0, 0, 220));
 
         int margin = 50;
-        int editorX = margin;
-        int editorY = margin;
-        int editorW = (screenWidth / 2) - margin; // Csak a képernyő bal fele
-        int editorH = screenHeight - (margin * 2);
-
-        // --- BAL OLDAL: ASSEMBLY EDITOR ---
-        Raylib.DrawRectangle(editorX, editorY, editorW, editorH, new Color(20, 20, 20, 255));
-        Raylib.DrawRectangleLines(editorX, editorY, editorW, editorH, Color.White);
-        Raylib.DrawText($"ASSEMBLY: {CurrentCard.Name}", editorX + 20, editorY + 20, 40, CurrentCard.HeaderColor);
+        int editorW = (screenWidth / 2) - margin;
         
-        string[] lines = CodeBuffer.Split('\n');
-        int lineY = editorY + 100;
-        for (int i = 0; i < lines.Length; i++)
+        // --- BAL OLDAL: EDITOR ---
+        DrawEditorPanel(margin, margin, editorW, screenHeight - 100);
+
+        // --- JOBB OLDAL: TARTALOM ---
+        int rightX = screenWidth / 2;
+        
+        if (CurrentState == EditorState.LevelSelect)
         {
-            Raylib.DrawText($"{i+1}.", editorX + 20, lineY, 40, Color.Gray);
-            Raylib.DrawText(lines[i], editorX + 100, lineY, 40, Color.White);
-            lineY += 45;
+            DrawLevelSelect(rightX, margin);
         }
-
-        cursorTimer += Raylib.GetFrameTime();
-        if (cursorTimer >= 0.5f) { cursorTimer = 0; cursorVisible = !cursorVisible; }
-        if (cursorVisible) Raylib.DrawRectangle(editorX + 100 + (lines[lines.Length-1].Length * 24), lineY - 45, 20, 40, Color.Green);
-
-        // --- JOBB OLDAL: FELADATOK ÉS FELOLDÁSOK ---
-        int panelX = screenWidth / 2;
-        int currentMaxUnlocked = GlobalUnlocks.ContainsKey(CurrentCard.Name) ? GlobalUnlocks[CurrentCard.Name] : 0;
-
-        Raylib.DrawText("TASKS & PERFORMANCE", panelX + 50, editorY + 20, 40, Color.White);
-        Raylib.DrawText("Solve tasks to permanently unlock higher multipliers for all machines of this type.", panelX + 50, editorY + 70, 20, Color.Gray);
-
-        // Segédfüggvény a szintek rajzolásához
-        DrawLevelButton(panelX + 50, 150, "EASY (x1 Multiplier)", "Basic logic. Always available.", 1, currentMaxUnlocked, CurrentCard.CurrentMultiplier == 1);
-        DrawLevelButton(panelX + 50, 300, "NORMAL (x2 Multiplier)", "Requires solving Easy first.", 2, currentMaxUnlocked, CurrentCard.CurrentMultiplier == 2);
-        DrawLevelButton(panelX + 50, 450, "HARD (x4 Multiplier)", "Requires solving Normal first.", 4, currentMaxUnlocked, CurrentCard.CurrentMultiplier == 4);
+        else
+        {
+            DrawPuzzleView(rightX, margin);
+        }
     }
 
-    private void DrawLevelButton(int x, int y, string title, string desc, int reqLevel, int unlockedLevel, bool isSelected)
+    private void DrawEditorPanel(int x, int y, int w, int h)
     {
-        bool isUnlocked = unlockedLevel >= (reqLevel == 4 ? 2 : reqLevel == 2 ? 1 : 0);
-        Color boxColor = isSelected ? Color.Green : (isUnlocked ? Color.DarkGray : new Color(50, 20, 20, 255));
+        Raylib.DrawRectangle(x, y, w, h, new Color(20, 20, 20, 255));
+        Raylib.DrawRectangleLines(x, y, w, h, Color.White);
+        Raylib.DrawText($"CODE: {CurrentCard.Name}", x + 20, y + 20, 30, CurrentCard.HeaderColor);
 
-        Raylib.DrawRectangle(x, y, 600, 100, boxColor);
-        Raylib.DrawRectangleLines(x, y, 600, 100, Color.White);
-
-        Raylib.DrawText(title, x + 20, y + 15, 30, Color.White);
-        Raylib.DrawText(desc, x + 20, y + 60, 20, Color.LightGray);
-
-        // Gomb rajzolása belül
-        Rectangle btnRec = new Rectangle(x, y, 300, 60); // Láthatatlan kattintási zóna (Update-ben kezelve)
+        string[] lines = CodeBuffer.Split('\n');
+        int lineY = y + 80;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            Raylib.DrawText($"{i+1}.", x + 20, lineY, 30, Color.Gray);
+            Raylib.DrawText(lines[i], x + 80, lineY, 30, Color.White);
+            lineY += 35;
+        }
         
-        if (isSelected)
-            Raylib.DrawText("ACTIVE", x + 450, y + 35, 30, Color.Black);
-        else if (isUnlocked)
-            Raylib.DrawText("CLICK TO SELECT", x + 400, y + 35, 20, Color.Lime);
-        else if (reqLevel == 2 && unlockedLevel == 0)
-            Raylib.DrawText("LOCKED (Solve Easy)", x + 380, y + 35, 20, Color.Red);
-        else if (reqLevel == 4 && unlockedLevel < 2)
-            Raylib.DrawText("LOCKED (Solve Normal)", x + 350, y + 35, 20, Color.Red);
-        else
-            Raylib.DrawText("CLICK TO UNLOCK", x + 400, y + 35, 20, Color.Yellow);
+        // Kurzor
+        cursorTimer += Raylib.GetFrameTime();
+        if (cursorTimer >= 0.5f) { cursorTimer = 0; cursorVisible = !cursorVisible; }
+        if (cursorVisible) Raylib.DrawRectangle(x + 80 + (lines[lines.Length-1].Length * 18), lineY - 35, 15, 30, Color.Green);
+
+        // --- TUTORIAL PANEL (Jobb Alul a Bal oldalon belül) ---
+        int tutH = 200;
+        int tutY = y + h - tutH;
+        Raylib.DrawRectangle(x, tutY, w, tutH, new Color(10, 10, 15, 255));
+        Raylib.DrawLine(x, tutY, x+w, tutY, Color.Gray);
+        Raylib.DrawText("TUTORIAL / CHEATSHEET", x + 10, tutY + 10, 20, Color.Gold);
+        
+        Raylib.DrawText("MOV dest, val  -> Set value (MOV AX, 5)", x + 20, tutY + 40, 15, Color.White);
+        Raylib.DrawText("ADD dest, val  -> Add value (ADD AX, 1)", x + 20, tutY + 60, 15, Color.White);
+        Raylib.DrawText("SUB / MUL / DIV -> Math operations", x + 20, tutY + 80, 15, Color.White);
+        Raylib.DrawText("IN reg         -> Read input (IN AX)", x + 20, tutY + 100, 15, Color.White);
+        Raylib.DrawText("OUT reg        -> Send output (OUT AX)", x + 20, tutY + 120, 15, Color.White);
+        Raylib.DrawText("JMP label      -> Jump to label (JMP START)", x + 20, tutY + 140, 15, Color.White);
+        Raylib.DrawText("CMP a, b       -> Compare for JE/JNE/JL/JG", x + 20, tutY + 160, 15, Color.White);
+    }
+
+    private void DrawLevelSelect(int x, int y)
+    {
+        Raylib.DrawText("SELECT OPTIMIZATION LEVEL", x + 50, y + 20, 30, Color.White);
+        int unlocked = GlobalUnlocks.ContainsKey(CurrentCard.Name) ? GlobalUnlocks[CurrentCard.Name] : 0;
+
+        DrawLevelBtn(x + 50, 150, "EASY (x1)", "Basic Task", 1, unlocked);
+        DrawLevelBtn(x + 50, 300, "NORMAL (x2)", "Advanced Logic", 2, unlocked);
+        DrawLevelBtn(x + 50, 450, "HARD (x4)", "Master Class", 4, unlocked);
+    }
+
+    private void DrawLevelBtn(int x, int y, string title, string desc, int level, int unlocked)
+    {
+        int req = level == 4 ? 2 : (level == 2 ? 1 : 0);
+        bool isLocked = unlocked < req;
+        Color col = isLocked ? new Color(50, 20, 20, 255) : Color.DarkGray;
+        if (CurrentCard.CurrentMultiplier == level) col = new Color(20, 80, 20, 255); // Active
+
+        Raylib.DrawRectangle(x, y, 500, 100, col);
+        Raylib.DrawRectangleLines(x, y, 500, 100, Color.White);
+        Raylib.DrawText(title, x + 20, y + 20, 30, isLocked ? Color.Gray : Color.White);
+        Raylib.DrawText(isLocked ? "LOCKED" : desc, x + 20, y + 60, 20, Color.LightGray);
+    }
+
+    private void DrawPuzzleView(int x, int y)
+    {
+        Raylib.DrawText($"PUZZLE: {TargetLevel}x Multiplier", x + 50, y + 20, 30, Color.Gold);
+        
+        // Leírás doboz
+        Raylib.DrawRectangle(x + 50, y + 80, 500, 150, new Color(30, 30, 30, 255));
+        Raylib.DrawRectangleLines(x + 50, y + 80, 500, 150, Color.White);
+        
+        // Sortörés egyszerű szimulálása
+        Raylib.DrawText(CurrentPuzzle.Description, x + 70, y + 100, 20, Color.White);
+        
+        string inEx = "Inputs: " + string.Join(", ", CurrentPuzzle.TestInputs);
+        string outEx = "Expected: " + string.Join(", ", CurrentPuzzle.ExpectedOutputs);
+        Raylib.DrawText(inEx, x + 70, y + 160, 20, Color.Yellow);
+        Raylib.DrawText(outEx, x + 70, y + 190, 20, Color.Green);
+
+        // EREDMÉNY
+        Raylib.DrawText("STATUS:", x + 50, y + 260, 20, Color.Gray);
+        Raylib.DrawText(TestResult, x + 50, y + 290, 25, ResultColor);
+
+        // GOMBOK
+        Raylib.DrawRectangle(x + 50, 400, 200, 50, Color.Blue);
+        Raylib.DrawText("RUN TEST", x + 85, 415, 20, Color.White);
+
+        Raylib.DrawRectangle(x + 270, 400, 150, 50, Color.DarkGray);
+        Raylib.DrawText("BACK", x + 315, 415, 20, Color.White);
     }
 }

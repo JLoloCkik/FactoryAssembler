@@ -20,3 +20,4 @@
 /home/lolo/developer/csharp-projects/FactoryAssembler/FactoryAssembler/obj/Debug/net9.0/FactoryAssembler.pdb
 /home/lolo/developer/csharp-projects/FactoryAssembler/FactoryAssembler/obj/Debug/net9.0/FactoryAssembler.genruntimeconfig.cache
 /home/lolo/developer/csharp-projects/FactoryAssembler/FactoryAssembler/obj/Debug/net9.0/ref/FactoryAssembler.dll
+/home/lolo/developer/csharp-projects/FactoryAssembler/FactoryAssembler/obj/Debug/net9.0/FactoryAssembler.sourcelink.json
