@@ -9,7 +9,6 @@ public class UIManager
 
     public void Draw(FactoryGame game, int screenW, int screenH, Vector2 mouseScreen)
     {
-        // 1. HOTBAR (Felül)
         int hotbarHeight = 50;
         Raylib.DrawRectangle(0, 0, screenW - 250, hotbarHeight, new Color(10, 10, 10, 200));
         Raylib.DrawLine(0, hotbarHeight, screenW - 250, hotbarHeight, Color.Gray);
@@ -21,8 +20,6 @@ public class UIManager
             itemX += 170;
         }
 
-        // --- ÚJ HELY: KÜLDETÉSEK (Bal fent, a Hotbar alatt) ---
-        // --- KÜLDETÉSEK (Bal fent) ---
         int questPanelY = hotbarHeight + 10; 
         Raylib.DrawRectangle(20, questPanelY, 350, 140, new Color(20, 20, 30, 220));
         Raylib.DrawRectangleLines(20, questPanelY, 350, 140, Color.Gold);
@@ -34,31 +31,19 @@ public class UIManager
             int currentAmount = GameState.Inventory.ContainsKey(q.TargetItem) ? GameState.Inventory[q.TargetItem] : 0;
             Raylib.DrawText(q.Title, 30, questPanelY + 40, 25, Color.White);
             
-            // Progress bar helyett, ha kész van: GOMB!
             if (currentAmount >= q.TargetAmount)
             {
-                // Zöld villogó gomb
                 Color btnColor = (Raylib.GetTime() % 1.0 < 0.5) ? Color.Green : Color.DarkGreen;
                 Raylib.DrawRectangle(30, questPanelY + 80, 330, 40, btnColor);
                 Raylib.DrawText($"CLAIM REWARD (+${q.RewardCredits})", 60, questPanelY + 90, 20, Color.Black);
-                
-                // KATTINTÁS ELLENŐRZÉSE ITT (Egyszerűsítés miatt a Draw-ban, bár Logicban szebb lenne)
-                if (Raylib.IsMouseButtonPressed(MouseButton.Left))
+                if (Raylib.IsMouseButtonPressed(MouseButton.Left) && Raylib.CheckCollisionPointRec(mouseScreen, new Rectangle(30, questPanelY + 80, 330, 40)))
                 {
-                    Vector2 m = Raylib.GetMousePosition();
-                    if (Raylib.CheckCollisionPointRec(m, new Rectangle(30, questPanelY + 80, 330, 40)))
-                    {
-                        // JUTALOM BEGYŰJTÉSE!
-                        GameState.Credits += q.RewardCredits;
-                        // Opcionális: Levonjuk a nyersanyagot? (Factorio-ban nem szokás, de itt lehet)
-                        // GameState.Inventory[q.TargetItem] -= q.TargetAmount; 
-                        GameState.CurrentQuestIndex++;
-                    }
+                    GameState.Credits += q.RewardCredits;
+                    GameState.CurrentQuestIndex++;
                 }
             }
             else
             {
-                // Még nincs kész -> Progress bar
                 Raylib.DrawText($"Gather {q.TargetAmount} {q.TargetItem}", 30, questPanelY + 75, 20, Color.LightGray);
                 float progress = System.Math.Clamp((float)currentAmount / q.TargetAmount, 0f, 1f);
                 Raylib.DrawRectangle(30, questPanelY + 105, 330, 15, Color.DarkGray);
@@ -69,18 +54,13 @@ public class UIManager
         else
         {
             Raylib.DrawText("ALL QUESTS COMPLETED!", 30, questPanelY + 50, 20, Color.Green);
-            Raylib.DrawText("You are a Factory Master!", 30, questPanelY + 80, 15, Color.White);
         }
-        // --- KÜLDETÉS PANEL VÉGE ---
 
-
-        // INFO GOMB (Legalsó sarok - ez marad)
         Rectangle infoBtn = new Rectangle(20, screenH - 60, 120, 40);
         Raylib.DrawRectangleRec(infoBtn, Color.DarkBlue);
         Raylib.DrawRectangleLinesEx(infoBtn, 2, Color.White);
         Raylib.DrawText("HOW TO PLAY", 30, screenH - 50, 15, Color.White);
 
-        // ÉPÍTÉSI MENÜ (Jobb sáv - ez marad)
         Rectangle uiRect = new Rectangle(screenW - 250, 0, 250, screenH);
         Raylib.DrawRectangleRec(uiRect, new Color(20, 20, 20, 255));
         Raylib.DrawLine(screenW - 250, 0, screenW - 250, screenH, Color.Gray);
@@ -92,14 +72,12 @@ public class UIManager
             var bp = GameState.Blueprints[i];
             int btnX = screenW - 240; int btnY = 100 + (i * 90);
             Rectangle btnRect = new Rectangle(btnX, btnY, 230, 70);
-            
             Color btnBgColor = GameState.Credits >= bp.Cost ? Color.DarkGray : new Color(60, 20, 20, 255);
             Raylib.DrawRectangle(btnX, btnY, 230, 70, btnBgColor);
             Raylib.DrawRectangle(btnX, btnY, 10, 70, bp.Color);
             Raylib.DrawText(bp.Name, btnX + 20, btnY + 10, 20, Color.White);
             Raylib.DrawText($"Cost: ${bp.Cost}", btnX + 20, btnY + 40, 15, GameState.Credits >= bp.Cost ? Color.Green : Color.Red);
 
-            // TOOLTIP
             if (Raylib.CheckCollisionPointRec(mouseScreen, btnRect))
             {
                 Raylib.DrawRectangleLines(btnX, btnY, 230, 70, Color.White);
@@ -111,7 +89,6 @@ public class UIManager
             }
         }
 
-        // SÚGÓ ABLAK (ez marad)
         if (ShowInfoPanel)
         {
             Raylib.DrawRectangle(0, 0, screenW, screenH, new Color(0, 0, 0, 200));
@@ -120,8 +97,8 @@ public class UIManager
             Raylib.DrawText("FACTORY PLANNER - HELP", screenW/2 - 180, screenH/2 - 170, 30, Color.Gold);
             Raylib.DrawText("- Buy machines from the right menu.", screenW/2 - 270, screenH/2 - 100, 20, Color.White);
             Raylib.DrawText("- Right-Click a machine to open the Assembly Editor.", screenW/2 - 270, screenH/2 - 60, 20, Color.White);
-            Raylib.DrawText("- DEL or BACKSPACE to delete and refund.", screenW/2 - 270, screenH/2 - 20, 20, Color.White);
-            Raylib.DrawText("- Complete Quests (top left) for Credits!", screenW/2 - 270, screenH/2 + 20, 20, Color.Green);
+            Raylib.DrawText("- SOLVE THE EASY TASK TO START PRODUCTION!", screenW/2 - 270, screenH/2 - 20, 20, Color.Orange);
+            Raylib.DrawText("- DEL or BACKSPACE to delete and refund.", screenW/2 - 270, screenH/2 + 20, 20, Color.White);
             Raylib.DrawText("Click anywhere to close", screenW/2 - 120, screenH/2 + 150, 20, Color.Gray);
         }
     }

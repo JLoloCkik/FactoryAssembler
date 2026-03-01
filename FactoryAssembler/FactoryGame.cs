@@ -16,19 +16,11 @@ public class FactoryGame
 
     public FactoryGame()
     {
-        // 1. HUB létrehozása a rács közepére (25, 25)
+        // HUB elhelyezése és kamera ráirányítása
         Card hubCard = new Card("HUB (Quests)", 25, 25, Color.Gold);
+        Vector2 hubPos = new Vector2(25 * 240 + 120, 25 * 320 + 160);
         
-        // 2. Kamera inicializálása: A HUB pixel koordinátáira mutasson!
-        // A HUB pixel pozíciója: 25 * 240 (szélesség), 25 * 320 (magasság)
-        Vector2 hubPos = new Vector2(25 * 240 + 120, 25 * 320 + 160); // +fél kártyányi eltolás
-        
-        Camera = new Camera2D() { 
-            Zoom = 1.0f, 
-            Target = hubPos, // <--- EZ A LÉNYEG: A HUB-ra néz!
-            Offset = new Vector2(1920 / 2f, 1080 / 2f) // Képernyő közepe
-        };
-
+        Camera = new Camera2D() { Zoom = 1.0f, Target = hubPos, Offset = new Vector2(1920 / 2f, 1080 / 2f) };
         Grid = new FactoryGrid(50, 50);
         Editor = new EditorUI() { GlobalUnlocks = GameState.GlobalUnlocks };
         UI = new UIManager();
@@ -45,7 +37,7 @@ public class FactoryGame
         
         bool isMouseOnUI = mouseScreen.X > screenW - 250 || Editor.IsVisible || UI.ShowInfoPanel;
 
-        // --- 1. TICK ÉS KÜLDETÉS ELLENŐRZÉS ---
+        // TICK
         if (!Editor.IsVisible)
         {
             tickTimer += Raylib.GetFrameTime();
@@ -56,21 +48,10 @@ public class FactoryGame
                 {
                     for (int i = 0; i < card.CurrentMultiplier; i++) card.VM.Step();
                 }
-
-                // Küldetés teljesítésének ellenőrzése
-                if (GameState.CurrentQuestIndex < GameState.Quests.Count)
-                {
-                    var q = GameState.Quests[GameState.CurrentQuestIndex];
-                    if (GameState.Inventory[q.TargetItem] >= q.TargetAmount)
-                    {
-                        GameState.Credits += q.RewardCredits;
-                        GameState.CurrentQuestIndex++; // Következő küldetés
-                    }
-                }
             }
         }
 
-        // --- 2. INTERAKCIÓK ---
+        // INTERAKCIÓ
         if (Editor.IsVisible) Editor.Update();
         else if (UI.ShowInfoPanel)
         {
@@ -78,7 +59,6 @@ public class FactoryGame
         }
         else
         {
-            // Info gomb
             if (Raylib.IsMouseButtonPressed(MouseButton.Left) && Raylib.CheckCollisionPointRec(mouseScreen, new Rectangle(20, screenH - 60, 120, 40)))
                 UI.ShowInfoPanel = true;
 
@@ -148,7 +128,7 @@ public class FactoryGame
                 draggedCard.GridX = x; draggedCard.GridY = y; draggedCard = null;
             }
 
-            // Editor megnyitás
+            // Editor
             if (!isMouseOnUI && draggedCard == null && Raylib.IsMouseButtonPressed(MouseButton.Right))
             {
                 (int gx, int gy) = Grid.GetGridPos(mouseWorld.X, mouseWorld.Y);
@@ -169,7 +149,6 @@ public class FactoryGame
         Raylib.BeginDrawing();
         Raylib.ClearBackground(new Color(30, 30, 30, 255));
         
-        // Pálya rajzolása
         Raylib.BeginMode2D(Camera);
         Grid.Draw(draggedCard);
         if (draggedCard != null)
@@ -181,7 +160,6 @@ public class FactoryGame
         }
         Raylib.EndMode2D();
 
-        // UI rajzolása
         UI.Draw(this, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), Raylib.GetMousePosition());
         if (Editor.IsVisible) Editor.Draw(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
 
