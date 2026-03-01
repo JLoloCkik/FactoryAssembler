@@ -10,12 +10,16 @@ public struct CardBlueprint
 
 public class Quest
 {
-    public string Title; public string TargetItem; public int TargetAmount; public int RewardCredits;
+    // Itt adunk alap értéket (= "") a Warningok ellen
+    public string Title { get; set; } = "";
+    public string TargetItem { get; set; } = "";
+    public int TargetAmount { get; set; }
+    public int RewardCredits { get; set; }
 }
 
 public static class GameState
 {
-    public static int Credits = 100; // Kezdőtőke
+    public static int Credits = 100; 
     
     public static Dictionary<string, int> Inventory = new Dictionary<string, int>()
     {
@@ -35,11 +39,10 @@ public static class GameState
 
     public static Dictionary<string, int> GlobalUnlocks = new Dictionary<string, int>();
 
-    // --- ÚJ: KÜLDETÉS RENDSZER ---
     public static List<Quest> Quests = new List<Quest>()
     {
-        new Quest { Title = "First Steps", TargetItem = "Coal", TargetAmount = 10, RewardCredits = 100 },
-        new Quest { Title = "Fuel the Fire", TargetItem = "Stone", TargetAmount = 25, RewardCredits = 150 },
+        new Quest { Title = "First Steps", TargetItem = "Stone", TargetAmount = 10, RewardCredits = 100 },
+        new Quest { Title = "Fuel the Fire", TargetItem = "Coal", TargetAmount = 25, RewardCredits = 150 },
         new Quest { Title = "Iron Age", TargetItem = "Iron Ore", TargetAmount = 20, RewardCredits = 300 }
     };
     public static int CurrentQuestIndex = 0;

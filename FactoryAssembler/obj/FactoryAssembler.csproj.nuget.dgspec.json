@@ -47,7 +47,7 @@
           "dependencies": {
             "Raylib-cs": {
               "target": "Package",
-              "version": "[7.0.2, )"
+              "version": "[7.0.0, )"
             }
           },
           "imports": [

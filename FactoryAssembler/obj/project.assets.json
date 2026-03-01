@@ -2,15 +2,15 @@
   "version": 3,
   "targets": {
     "net9.0": {
-      "Raylib-cs/7.0.2": {
+      "Raylib-cs/7.0.0": {
         "type": "package",
         "compile": {
-          "lib/net8.0/Raylib-cs.dll": {
+          "lib/net6.0/Raylib-cs.dll": {
             "related": ".xml"
           }
         },
         "runtime": {
-          "lib/net8.0/Raylib-cs.dll": {
+          "lib/net6.0/Raylib-cs.dll": {
             "related": ".xml"
           }
         },
@@ -40,19 +40,17 @@
     }
   },
   "libraries": {
-    "Raylib-cs/7.0.2": {
-      "sha512": "tpisH03Z9AfdTKFTe7iIA7RNeSaQFE97A+7ApXJUaOHzg2hczBXA1J/2uF7teKHsVXSuGqoV2aHAbaeJJMqulw==",
+    "Raylib-cs/7.0.0": {
+      "sha512": "8SvFkeKujjBToZTzVGKiYQErvQaekDxWIdNIVUDiayKamMR7vT9ZzUv0W4BfQ6iA02KOui5I9HSzI6Cq9u4jCA==",
       "type": "package",
-      "path": "raylib-cs/7.0.2",
+      "path": "raylib-cs/7.0.0",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "README.md",
         "lib/net6.0/Raylib-cs.dll",
         "lib/net6.0/Raylib-cs.xml",
-        "lib/net8.0/Raylib-cs.dll",
-        "lib/net8.0/Raylib-cs.xml",
-        "raylib-cs.7.0.2.nupkg.sha512",
+        "raylib-cs.7.0.0.nupkg.sha512",
         "raylib-cs.nuspec",
         "raylib-cs_64x64.png",
         "runtimes/linux-x64/native/libraylib.so",
@@ -65,7 +63,7 @@
   },
   "projectFileDependencyGroups": {
     "net9.0": [
-      "Raylib-cs >= 7.0.2"
+      "Raylib-cs >= 7.0.0"
     ]
   },
   "packageFolders": {
@@ -114,7 +112,7 @@
         "dependencies": {
           "Raylib-cs": {
             "target": "Package",
-            "version": "[7.0.2, )"
+            "version": "[7.0.0, )"
           }
         },
         "imports": [

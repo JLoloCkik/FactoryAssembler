@@ -16,12 +16,24 @@ public class FactoryGame
 
     public FactoryGame()
     {
-        Camera = new Camera2D() { Zoom = 1.0f, Offset = new Vector2(1920 / 2f, 1080 / 2f) };
+        // 1. HUB létrehozása a rács közepére (25, 25)
+        Card hubCard = new Card("HUB (Quests)", 25, 25, Color.Gold);
+        
+        // 2. Kamera inicializálása: A HUB pixel koordinátáira mutasson!
+        // A HUB pixel pozíciója: 25 * 240 (szélesség), 25 * 320 (magasság)
+        Vector2 hubPos = new Vector2(25 * 240 + 120, 25 * 320 + 160); // +fél kártyányi eltolás
+        
+        Camera = new Camera2D() { 
+            Zoom = 1.0f, 
+            Target = hubPos, // <--- EZ A LÉNYEG: A HUB-ra néz!
+            Offset = new Vector2(1920 / 2f, 1080 / 2f) // Képernyő közepe
+        };
+
         Grid = new FactoryGrid(50, 50);
         Editor = new EditorUI() { GlobalUnlocks = GameState.GlobalUnlocks };
         UI = new UIManager();
 
-        Grid.AddCard(new Card("HUB (Quests)", 25, 25, Color.Gold));
+        Grid.AddCard(hubCard);
     }
 
     public void Update()
