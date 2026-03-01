@@ -22,7 +22,8 @@ public class UIManager
         }
 
         // --- ÚJ HELY: KÜLDETÉSEK (Bal fent, a Hotbar alatt) ---
-        int questPanelY = hotbarHeight + 10; // Közvetlenül a Hotbar alá
+        // --- KÜLDETÉSEK (Bal fent) ---
+        int questPanelY = hotbarHeight + 10; 
         Raylib.DrawRectangle(20, questPanelY, 350, 140, new Color(20, 20, 30, 220));
         Raylib.DrawRectangleLines(20, questPanelY, 350, 140, Color.Gold);
         Raylib.DrawText("CURRENT QUEST", 30, questPanelY + 10, 20, Color.Gold);
@@ -32,17 +33,43 @@ public class UIManager
             Quest q = GameState.Quests[GameState.CurrentQuestIndex];
             int currentAmount = GameState.Inventory.ContainsKey(q.TargetItem) ? GameState.Inventory[q.TargetItem] : 0;
             Raylib.DrawText(q.Title, 30, questPanelY + 40, 25, Color.White);
-            Raylib.DrawText($"Gather {q.TargetAmount} {q.TargetItem}", 30, questPanelY + 75, 20, Color.LightGray);
             
-            // Progress bar
-            float progress = System.Math.Clamp((float)currentAmount / q.TargetAmount, 0f, 1f);
-            Raylib.DrawRectangle(30, questPanelY + 105, 330, 15, Color.DarkGray);
-            Raylib.DrawRectangle(30, questPanelY + 105, (int)(330 * progress), 15, Color.Green);
-            Raylib.DrawText($"{currentAmount} / {q.TargetAmount}", 160, questPanelY + 105, 15, Color.White);
+            // Progress bar helyett, ha kész van: GOMB!
+            if (currentAmount >= q.TargetAmount)
+            {
+                // Zöld villogó gomb
+                Color btnColor = (Raylib.GetTime() % 1.0 < 0.5) ? Color.Green : Color.DarkGreen;
+                Raylib.DrawRectangle(30, questPanelY + 80, 330, 40, btnColor);
+                Raylib.DrawText($"CLAIM REWARD (+${q.RewardCredits})", 60, questPanelY + 90, 20, Color.Black);
+                
+                // KATTINTÁS ELLENŐRZÉSE ITT (Egyszerűsítés miatt a Draw-ban, bár Logicban szebb lenne)
+                if (Raylib.IsMouseButtonPressed(MouseButton.Left))
+                {
+                    Vector2 m = Raylib.GetMousePosition();
+                    if (Raylib.CheckCollisionPointRec(m, new Rectangle(30, questPanelY + 80, 330, 40)))
+                    {
+                        // JUTALOM BEGYŰJTÉSE!
+                        GameState.Credits += q.RewardCredits;
+                        // Opcionális: Levonjuk a nyersanyagot? (Factorio-ban nem szokás, de itt lehet)
+                        // GameState.Inventory[q.TargetItem] -= q.TargetAmount; 
+                        GameState.CurrentQuestIndex++;
+                    }
+                }
+            }
+            else
+            {
+                // Még nincs kész -> Progress bar
+                Raylib.DrawText($"Gather {q.TargetAmount} {q.TargetItem}", 30, questPanelY + 75, 20, Color.LightGray);
+                float progress = System.Math.Clamp((float)currentAmount / q.TargetAmount, 0f, 1f);
+                Raylib.DrawRectangle(30, questPanelY + 105, 330, 15, Color.DarkGray);
+                Raylib.DrawRectangle(30, questPanelY + 105, (int)(330 * progress), 15, Color.Orange);
+                Raylib.DrawText($"{currentAmount} / {q.TargetAmount}", 160, questPanelY + 105, 15, Color.White);
+            }
         }
         else
         {
-            Raylib.DrawText("All quests completed!", 30, questPanelY + 50, 20, Color.Green);
+            Raylib.DrawText("ALL QUESTS COMPLETED!", 30, questPanelY + 50, 20, Color.Green);
+            Raylib.DrawText("You are a Factory Master!", 30, questPanelY + 80, 15, Color.White);
         }
         // --- KÜLDETÉS PANEL VÉGE ---
 
