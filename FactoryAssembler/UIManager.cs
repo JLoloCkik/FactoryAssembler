@@ -1,5 +1,6 @@
 using Raylib_cs;
 using System.Numerics;
+using System;
 
 namespace FactoryAssembler;
 
@@ -9,18 +10,33 @@ public class UIManager
 
     public void Draw(FactoryGame game, int screenW, int screenH, Vector2 mouseScreen)
     {
-        int hotbarHeight = 50;
-        Raylib.DrawRectangle(0, 0, screenW - 250, hotbarHeight, new Color(10, 10, 10, 200));
-        Raylib.DrawLine(0, hotbarHeight, screenW - 250, hotbarHeight, Color.Gray);
-        int itemX = 20;
+        // 1. HOTBAR
+        int hotbarHeight = 85; 
+        int usableWidth = screenW - 250;
+        
+        Raylib.DrawRectangle(0, 0, usableWidth, hotbarHeight, new Color(10, 10, 10, 200));
+        Raylib.DrawLine(0, hotbarHeight, usableWidth, hotbarHeight, Color.Gray);
+        
+        int columns = 4; 
+        int colWidth = usableWidth / columns; 
+        
+        int itemIndex = 0;
         foreach (var item in GameState.Inventory)
         {
-            Program.DrawText($"{item.Key}:", itemX, 15, 20, Color.LightGray);
-            Program.DrawText($"{item.Value}", itemX + Program.MeasureText($"{item.Key}: ", 20), 15, 20, Color.White);
-            itemX += 170;
+            int row = itemIndex / columns;
+            int col = itemIndex % columns;
+            int itemX = 20 + (col * colWidth);
+            int itemY = 15 + (row * 35); 
+            
+            DrawItemIcon(item.Key, itemX, itemY);
+            Program.DrawText($"{item.Key}:", itemX + 25, itemY, 20, Color.LightGray);
+            Program.DrawText($"{item.Value}", itemX + 25 + Program.MeasureText($"{item.Key}: ", 20), itemY, 20, Color.White);
+            
+            itemIndex++;
         }
 
-        int questPanelY = hotbarHeight + 10; 
+        // 2. KÜLDETÉS PANEL
+        int questPanelY = hotbarHeight + 15; 
         Raylib.DrawRectangle(20, questPanelY, 350, 140, new Color(20, 20, 30, 220));
         Raylib.DrawRectangleLines(20, questPanelY, 350, 140, Color.Gold);
         Program.DrawText("CURRENT QUEST", 30, questPanelY + 10, 20, Color.Gold);
@@ -48,11 +64,22 @@ public class UIManager
             }
         } else { Program.DrawText("ALL QUESTS DONE!", 30, questPanelY + 50, 20, Color.Green); }
 
+        // 3. GOMBOK LENT
         Rectangle infoBtn = new Rectangle(20, screenH - 60, 150, 40);
         Raylib.DrawRectangleRec(infoBtn, Color.DarkBlue);
         Raylib.DrawRectangleLinesEx(infoBtn, 2, Color.White);
         Program.DrawText("HOW TO PLAY", 30, screenH - 50, 18, Color.White);
 
+        Rectangle saveBtn = new Rectangle(190, screenH - 60, 150, 40);
+        Raylib.DrawRectangleRec(saveBtn, Color.DarkGreen);
+        Raylib.DrawRectangleLinesEx(saveBtn, 2, Color.White);
+        Program.DrawText("SAVE GAME", 215, screenH - 50, 18, Color.White);
+        
+        if (Raylib.IsMouseButtonPressed(MouseButton.Left) && Raylib.CheckCollisionPointRec(mouseScreen, saveBtn)) {
+            GameState.SaveGame(game.Grid);
+        }
+
+        // 4. ÉPÍTÉS MENÜ
         Rectangle uiRect = new Rectangle(screenW - 250, 0, 250, screenH);
         Raylib.DrawRectangleRec(uiRect, new Color(20, 20, 20, 255));
         Raylib.DrawLine(screenW - 250, 0, screenW - 250, screenH, Color.Gray);
@@ -76,15 +103,14 @@ public class UIManager
                 Raylib.DrawRectangle(tipX, btnY, 250, 100, new Color(0, 0, 0, 220));
                 Raylib.DrawRectangleLines(tipX, btnY, 250, 100, bp.Color);
                 Program.DrawText("INFO", tipX + 10, btnY + 10, 18, Color.Yellow);
-                
                 int lineY = btnY + 35;
                 foreach(var line in bp.Description.Split('\n')) {
-                    Program.DrawText(line, tipX + 10, lineY, 16, Color.LightGray);
-                    lineY += 20;
+                    Program.DrawText(line, tipX + 10, lineY, 16, Color.LightGray); lineY += 20;
                 }
             }
         }
 
+        // SÚGÓ ABLAK
         if (ShowInfoPanel)
         {
             Raylib.DrawRectangle(0, 0, screenW, screenH, new Color(0, 0, 0, 200));
@@ -92,10 +118,11 @@ public class UIManager
             Raylib.DrawRectangleLines(screenW/2 - 350, screenH/2 - 250, 700, 500, Color.Gold);
             Program.DrawText("FACTORY PLANNER - HELP", screenW/2 - 200, screenH/2 - 220, 35, Color.Gold);
             Program.DrawText("- Buy machines from the right menu.", screenW/2 - 320, screenH/2 - 130, 24, Color.White);
-            Program.DrawText("- Machines automatically send items to the HUB.", screenW/2 - 320, screenH/2 - 90, 24, Color.White);
-            Program.DrawText("- Right-Click a machine to open the Assembly Editor.", screenW/2 - 320, screenH/2 - 50, 24, Color.White);
-            Program.DrawText("- SOLVE THE EASY TASK TO START PRODUCTION!", screenW/2 - 320, screenH/2 - 10, 24, Color.Orange);
-            Program.DrawText("- DEL or BACKSPACE to delete and refund.", screenW/2 - 320, screenH/2 + 30, 24, Color.White);
+            Program.DrawText("- Machines automatically send items to the MARKET.", screenW/2 - 320, screenH/2 - 90, 24, Color.White);
+            Program.DrawText("- Right-Click MARKET to sell items for Credits.", screenW/2 - 320, screenH/2 - 50, 24, Color.Green);
+            Program.DrawText("- Right-Click a machine to open the Assembly Editor.", screenW/2 - 320, screenH/2 - 10, 24, Color.White);
+            Program.DrawText("- SOLVE THE EASY TASK TO START PRODUCTION!", screenW/2 - 320, screenH/2 + 30, 24, Color.Orange);
+            Program.DrawText("- DEL or BACKSPACE to delete and refund.", screenW/2 - 320, screenH/2 + 70, 24, Color.White);
             Program.DrawText("Click anywhere to close", screenW/2 - 150, screenH/2 + 180, 22, Color.Gray);
         }
 
@@ -116,6 +143,56 @@ public class UIManager
             if (Raylib.IsMouseButtonPressed(MouseButton.Left) && Raylib.CheckCollisionPointRec(mouseScreen, new Rectangle(winX + 250, winY + 310, 300, 60))) {
                 GameState.Inventory["Rocket"] = 0; 
             }
+        }
+    }
+
+    public void UpdateMainMenu(FactoryGame game)
+    {
+        Vector2 mouse = Raylib.GetMousePosition();
+        int screenW = Raylib.GetScreenWidth(); int screenH = Raylib.GetScreenHeight();
+        int menuX = screenW / 2 - 200; int startY = screenH / 2;
+
+        if (Raylib.IsMouseButtonPressed(MouseButton.Left))
+        {
+            if (Raylib.CheckCollisionPointRec(mouse, new Rectangle(menuX, startY, 400, 60))) game.StartNewGame();
+            if (System.IO.File.Exists("savegame.json") && Raylib.CheckCollisionPointRec(mouse, new Rectangle(menuX, startY + 80, 400, 60))) game.LoadGame();
+            if (Raylib.CheckCollisionPointRec(mouse, new Rectangle(menuX, startY + 160, 400, 60))) System.Environment.Exit(0); 
+        }
+    }
+
+    public void DrawMainMenu()
+    {
+        int screenW = Raylib.GetScreenWidth(); int screenH = Raylib.GetScreenHeight();
+        Vector2 mouse = Raylib.GetMousePosition();
+        Program.DrawText("FACTORY ASSEMBLER", screenW / 2 - 320, screenH / 3 - 50, 70, Color.Gold);
+        Program.DrawText("Program machines. Automate production. Launch the Rocket.", screenW / 2 - 380, screenH / 3 + 40, 26, Color.LightGray);
+
+        int menuX = screenW / 2 - 200; int startY = screenH / 2;
+        Color c1 = Raylib.CheckCollisionPointRec(mouse, new Rectangle(menuX, startY, 400, 60)) ? Color.Green : Color.DarkGreen;
+        Raylib.DrawRectangle(menuX, startY, 400, 60, c1);
+        Program.DrawText("NEW GAME", menuX + 130, startY + 15, 30, Color.White);
+
+        bool hasSave = System.IO.File.Exists("savegame.json");
+        Color c2 = hasSave ? (Raylib.CheckCollisionPointRec(mouse, new Rectangle(menuX, startY + 80, 400, 60)) ? Color.Blue : Color.DarkBlue) : Color.DarkGray;
+        Raylib.DrawRectangle(menuX, startY + 80, 400, 60, c2);
+        Program.DrawText("CONTINUE", menuX + 130, startY + 95, 30, hasSave ? Color.White : Color.Gray);
+
+        Color c3 = Raylib.CheckCollisionPointRec(mouse, new Rectangle(menuX, startY + 160, 400, 60)) ? Color.Red : Color.Maroon;
+        Raylib.DrawRectangle(menuX, startY + 160, 400, 60, c3);
+        Program.DrawText("QUIT", menuX + 160, startY + 175, 30, Color.White);
+    }
+
+    private void DrawItemIcon(string name, int x, int y)
+    {
+        switch (name) {
+            case "Coal": Raylib.DrawRectangle(x, y + 2, 16, 16, new Color(40, 40, 40, 255)); Raylib.DrawRectangleLines(x, y + 2, 16, 16, Color.DarkGray); break;
+            case "Iron Ore": Raylib.DrawCircle(x + 8, y + 10, 8, new Color(200, 120, 50, 255)); break;
+            case "Copper Ore": Raylib.DrawCircle(x + 8, y + 10, 8, new Color(200, 80, 40, 255)); break;
+            case "Iron Ingot": Raylib.DrawRectangle(x, y + 4, 18, 12, Color.LightGray); Raylib.DrawRectangleLines(x, y + 4, 18, 12, Color.Gray); break;
+            case "Copper Ingot": Raylib.DrawRectangle(x, y + 4, 18, 12, new Color(210, 100, 50, 255)); Raylib.DrawRectangleLines(x, y + 4, 18, 12, new Color(150, 60, 30, 255)); break;
+            case "Wall": Raylib.DrawRectangle(x, y + 2, 16, 16, Color.Gray); Raylib.DrawLine(x, y + 10, x + 16, y + 10, Color.DarkGray); Raylib.DrawLine(x + 8, y + 2, x + 8, y + 18, Color.DarkGray); break;
+            case "Gear": Raylib.DrawCircleLines(x + 8, y + 10, 8, Color.LightGray); Raylib.DrawCircle(x + 8, y + 10, 3, Color.LightGray); break;
+            case "Rocket": Raylib.DrawTriangle(new Vector2(x + 8, y), new Vector2(x, y + 18), new Vector2(x + 16, y + 18), Color.Red); break;
         }
     }
 }

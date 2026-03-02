@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Collections.Generic;
 using Raylib_cs;
 
 namespace FactoryAssembler;
@@ -10,7 +11,6 @@ public class Card
     public int GridY { get; set; }
     public Color HeaderColor { get; set; }
     
-    // --- ÚJ: Méret szorzók a HUB-hoz ---
     public int WidthSlots { get; set; } = 1;
     public int HeightSlots { get; set; } = 1;
     
@@ -61,31 +61,32 @@ public class Card
     {
         float drawX = (GridX * cellWidth) + 10; 
         float drawY = (GridY * cellHeight) + 10;
-        
-        // Kiszámoljuk a tényleges méretet
         float cardW = (cellWidth * WidthSlots) - 20; 
         float cardH = (cellHeight * HeightSlots) - 20;
 
-        Raylib.DrawRectangleRounded(new Rectangle(drawX + 8, drawY + 8, cardW, cardH), 0.1f, 10, new Color(0,0,0,100));
+        Raylib.DrawRectangleRounded(new Rectangle(drawX + 8, drawY + 8, cardW, cardH), 0.05f, 10, new Color(0,0,0,100));
         Rectangle bodyRect = new Rectangle(drawX, drawY, cardW, cardH);
-        Raylib.DrawRectangleRounded(bodyRect, 0.1f, 10, new Color(40, 44, 52, 255)); 
+        Raylib.DrawRectangleRounded(bodyRect, 0.05f, 10, new Color(40, 44, 52, 255)); 
 
         float headerHeight = 50;
-        Raylib.DrawRectangleRounded(new Rectangle(drawX, drawY, cardW, headerHeight), 0.1f, 10, HeaderColor);
-        Raylib.DrawRectangle((int)drawX, (int)drawY + 25, (int)cardW, 25, HeaderColor);
-        Raylib.DrawRectangleRoundedLines(bodyRect, 0.1f, 10, Color.LightGray);
+        Raylib.DrawRectangleRounded(new Rectangle(drawX, drawY, cardW, headerHeight), 0.05f, 10, HeaderColor);
+        Raylib.DrawRectangle((int)drawX, (int)drawY + 20, (int)cardW, (int)headerHeight - 20, HeaderColor); 
+        Raylib.DrawRectangleRoundedLines(bodyRect, 0.05f, 10, Color.LightGray);
 
-        // --- HA EZ A HUB, CSAK A LÁTVÁNYT RAJZOLJUK, NINCS PORT ÉS KÓD ---
-        if (Name == "HUB")
+        if (Name == "MARKET")
         {
-            Program.DrawText("MAIN LOGISTICS HUB", drawX + 20, drawY + 15, 30, Color.White);
-            Program.DrawText("Automatically receives all produced items.", drawX + 20, drawY + 90, 20, Color.LightGray);
-            Program.DrawText("Provides materials for Crafting and Quests.", drawX + 20, drawY + 130, 20, Color.LightGray);
-            Program.DrawText("NO CODING REQUIRED", drawX + 20, drawY + 200, 25, Color.Green);
-            return; // Itt kilépünk, nem rajzoljuk a portokat
+            Program.DrawText("GLOBAL MARKET", drawX + 20, drawY + 15, 30, Color.White);
+            string hubText = "Automatically receives all produced items.\n\nProvides materials for Crafting and Quests.";
+            string wrappedText = Program.WordWrap(hubText, 22, cardW - 40);
+            int textY = (int)drawY + 80;
+            foreach(var line in wrappedText.Split('\n')) {
+                Program.DrawText(line, drawX + 20, textY, 22, Color.LightGray);
+                textY += 30;
+            }
+            Program.DrawText("RIGHT-CLICK TO SELL", drawX + 20, drawY + cardH - 40, 24, Color.Lime);
+            return; 
         }
 
-        // --- NORMÁL GÉP RAJZOLÁSA ---
         int portY = (int)drawY + (int)(cardH / 2) + 20;
         Raylib.DrawCircle((int)drawX, portY, 10, Color.Black); Raylib.DrawCircle((int)drawX, portY, 6, Color.White); 
         Raylib.DrawRectangle((int)drawX + 15, portY - 10, 40, 25, Color.Black);

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using Raylib_cs;
+using System.IO;
+using System.Text.Json;
 
 namespace FactoryAssembler;
 
@@ -16,14 +18,35 @@ public class Quest
     public int RewardCredits { get; set; }
 }
 
+public class GameSaveData
+{
+    public int Credits { get; set; }
+    public int QuestIndex { get; set; }
+    public Dictionary<string, int> Inventory { get; set; } = new();
+    public Dictionary<string, int> Unlocks { get; set; } = new();
+    public List<CardSaveData> Cards { get; set; } = new();
+}
+
+public class CardSaveData
+{
+    public string Name { get; set; } = "";
+    public int X { get; set; }
+    public int Y { get; set; }
+    public List<string> Instructions { get; set; } = new();
+}
+
 public static class GameState
 {
     public static int Credits = 100; 
-    
-    public static Dictionary<string, int> Inventory = new Dictionary<string, int>()
+    public static Dictionary<string, int> Inventory = new Dictionary<string, int>();
+    public static Dictionary<string, int> GlobalUnlocks = new Dictionary<string, int>();
+    public static List<Quest> Quests = QuestDatabase.GetQuests();
+    public static int CurrentQuestIndex = 0;
+
+    public static Dictionary<string, int> Prices = new Dictionary<string, int>()
     {
-        {"Coal", 0}, {"Iron Ore", 0}, {"Copper Ore", 0},
-        {"Iron Ingot", 0}, {"Copper Ingot", 0}, {"Wall", 0}, {"Gear", 0}, {"Rocket", 0}
+        {"Coal", 1}, {"Iron Ore", 2}, {"Copper Ore", 2},
+        {"Iron Ingot", 6}, {"Copper Ingot", 6}, {"Wall", 10}, {"Gear", 15}, {"Rocket", 0} 
     };
 
     public static List<CardBlueprint> Blueprints = new List<CardBlueprint>()
@@ -36,7 +59,35 @@ public static class GameState
         new CardBlueprint { Name = "Rocket Silo", Color = new Color(200, 0, 200, 255), Cost = 2000, Description = "Req: 10 Gear + 10 Cu Ingot\nMakes: ROCKET (WIN!)" }
     };
 
-    public static Dictionary<string, int> GlobalUnlocks = new Dictionary<string, int>();
-    public static List<Quest> Quests = QuestDatabase.GetQuests();
-    public static int CurrentQuestIndex = 0;
+    public static void ResetGame()
+    {
+        Credits = 100;
+        CurrentQuestIndex = 0;
+        GlobalUnlocks.Clear();
+        Inventory.Clear();
+        Inventory.Add("Coal", 0); Inventory.Add("Iron Ore", 0); Inventory.Add("Copper Ore", 0);
+        Inventory.Add("Iron Ingot", 0); Inventory.Add("Copper Ingot", 0); 
+        Inventory.Add("Wall", 0); Inventory.Add("Gear", 0); Inventory.Add("Rocket", 0);
+    }
+
+    public static void SaveGame(FactoryGrid grid)
+    {
+        GameSaveData data = new GameSaveData
+        {
+            Credits = Credits,
+            QuestIndex = CurrentQuestIndex,
+            Inventory = Inventory,
+            Unlocks = GlobalUnlocks
+        };
+
+        foreach(var card in grid.PlacedCards) {
+            data.Cards.Add(new CardSaveData {
+                Name = card.Name, X = card.GridX, Y = card.GridY,
+                Instructions = new List<string>(card.VM.Instructions)
+            });
+        }
+
+        string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText("savegame.json", json);
+    }
 }
