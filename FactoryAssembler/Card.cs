@@ -9,16 +9,19 @@ public class Card
     public int GridX { get; set; }
     public int GridY { get; set; }
     public Color HeaderColor { get; set; }
+    
+    // --- ÚJ: Méret szorzók a HUB-hoz ---
+    public int WidthSlots { get; set; } = 1;
+    public int HeightSlots { get; set; } = 1;
+    
     public int CurrentMultiplier { get; set; } = 1;
+    public bool HasMissingMaterials { get; set; } = false;
 
     public VirtualMachine VM { get; private set; }
 
     public Card(string name, int x, int y, Color color)
     {
-        Name = name;
-        GridX = x;
-        GridY = y;
-        HeaderColor = color;
+        Name = name; GridX = x; GridY = y; HeaderColor = color;
         VM = new VirtualMachine();
         
         VM.OnOutput += (val) => 
@@ -30,25 +33,38 @@ public class Card
 
     private void ProduceItem(int val)
     {
-        string product = "";
-        
-        if (Name == "Coal Miner") product = "Coal";
-        else if (Name == "Iron Miner") product = "Iron Ore";
-        else if (Name == "Copper Miner") product = "Copper Ore";
-        else if (Name == "Smelter") product = "Iron Ingot"; 
-        else if (Name == "Assembler") product = "Gear"; 
+        HasMissingMaterials = false; 
 
-        if (!string.IsNullOrEmpty(product) && GameState.Inventory.ContainsKey(product))
-        {
-            GameState.Inventory[product] += 1;
+        if (Name == "Coal Miner") GameState.Inventory["Coal"]++;
+        else if (Name == "Iron Miner") GameState.Inventory["Iron Ore"]++;
+        else if (Name == "Copper Miner") GameState.Inventory["Copper Ore"]++;
+        else if (Name == "Smelter") {
+            if (GameState.Inventory["Iron Ore"] > 0 && GameState.Inventory["Coal"] > 0) {
+                GameState.Inventory["Iron Ore"]--; GameState.Inventory["Coal"]--; GameState.Inventory["Iron Ingot"]++;
+            } else if (GameState.Inventory["Copper Ore"] > 0 && GameState.Inventory["Coal"] > 0) {
+                GameState.Inventory["Copper Ore"]--; GameState.Inventory["Coal"]--; GameState.Inventory["Copper Ingot"]++;
+            } else HasMissingMaterials = true; 
+        }
+        else if (Name == "Assembler") {
+            if (GameState.Inventory["Iron Ingot"] >= 2) {
+                GameState.Inventory["Iron Ingot"] -= 2; GameState.Inventory["Gear"]++;
+            } else HasMissingMaterials = true;
+        }
+        else if (Name == "Rocket Silo") {
+            if (GameState.Inventory["Gear"] >= 10 && GameState.Inventory["Copper Ingot"] >= 10) {
+                GameState.Inventory["Gear"] -= 10; GameState.Inventory["Copper Ingot"] -= 10; GameState.Inventory["Rocket"]++;
+            } else HasMissingMaterials = true;
         }
     }
 
-    public void Draw(int width, int height)
+    public void Draw(int cellWidth, int cellHeight)
     {
-        float posX = GridX * width; float posY = GridY * height;
-        float cardW = width - 20; float cardH = height - 20;
-        float drawX = posX + 10; float drawY = posY + 10;
+        float drawX = (GridX * cellWidth) + 10; 
+        float drawY = (GridY * cellHeight) + 10;
+        
+        // Kiszámoljuk a tényleges méretet
+        float cardW = (cellWidth * WidthSlots) - 20; 
+        float cardH = (cellHeight * HeightSlots) - 20;
 
         Raylib.DrawRectangleRounded(new Rectangle(drawX + 8, drawY + 8, cardW, cardH), 0.1f, 10, new Color(0,0,0,100));
         Rectangle bodyRect = new Rectangle(drawX, drawY, cardW, cardH);
@@ -59,23 +75,38 @@ public class Card
         Raylib.DrawRectangle((int)drawX, (int)drawY + 25, (int)cardW, 25, HeaderColor);
         Raylib.DrawRectangleRoundedLines(bodyRect, 0.1f, 10, Color.LightGray);
 
+        // --- HA EZ A HUB, CSAK A LÁTVÁNYT RAJZOLJUK, NINCS PORT ÉS KÓD ---
+        if (Name == "HUB")
+        {
+            Program.DrawText("MAIN LOGISTICS HUB", drawX + 20, drawY + 15, 30, Color.White);
+            Program.DrawText("Automatically receives all produced items.", drawX + 20, drawY + 90, 20, Color.LightGray);
+            Program.DrawText("Provides materials for Crafting and Quests.", drawX + 20, drawY + 130, 20, Color.LightGray);
+            Program.DrawText("NO CODING REQUIRED", drawX + 20, drawY + 200, 25, Color.Green);
+            return; // Itt kilépünk, nem rajzoljuk a portokat
+        }
+
+        // --- NORMÁL GÉP RAJZOLÁSA ---
         int portY = (int)drawY + (int)(cardH / 2) + 20;
         Raylib.DrawCircle((int)drawX, portY, 10, Color.Black); Raylib.DrawCircle((int)drawX, portY, 6, Color.White); 
         Raylib.DrawRectangle((int)drawX + 15, portY - 10, 40, 25, Color.Black);
-        Raylib.DrawText(VM.InputBuffer.Count.ToString(), (int)drawX + 25, portY - 5, 20, Color.Yellow);
+        Program.DrawText(VM.InputBuffer.Count.ToString(), drawX + 25, portY - 5, 20, Color.Yellow);
 
         Raylib.DrawCircle((int)drawX + (int)cardW, portY, 10, Color.Black); Raylib.DrawCircle((int)drawX + (int)cardW, portY, 6, Color.White);
         Raylib.DrawRectangle((int)drawX + (int)cardW - 55, portY - 10, 40, 25, Color.Black);
-        Raylib.DrawText(VM.OutputBuffer.Count.ToString(), (int)drawX + (int)cardW - 45, portY - 5, 20, Color.Green);
+        Program.DrawText(VM.OutputBuffer.Count.ToString(), drawX + cardW - 45, portY - 5, 20, Color.Green);
 
-        int fontSize = 24; int textWidth = Raylib.MeasureText(Name, fontSize);
-        Raylib.DrawText(Name, (int)drawX + (int)(cardW / 2) - (textWidth / 2), (int)drawY + (int)(headerHeight / 2) - (fontSize / 2), fontSize, Color.White);
-        Raylib.DrawText($"x{CurrentMultiplier}", (int)drawX + (int)cardW - 35, (int)drawY + 10, 20, Color.Yellow);
+        int fontSize = 24; int textW = Program.MeasureText(Name, fontSize);
+        Program.DrawText(Name, drawX + (cardW / 2) - (textW / 2), drawY + (headerHeight / 2) - (fontSize / 2), fontSize, Color.White);
+        
+        int unlockedLvl = GameState.GlobalUnlocks.ContainsKey(Name) ? GameState.GlobalUnlocks[Name] : 0;
+        if (unlockedLvl > 0) Program.DrawText($"x{CurrentMultiplier}", drawX + cardW - 45, drawY + 10, 24, Color.Yellow);
+        else Program.DrawText("LOCKED", drawX + cardW - 80, drawY + 15, 15, Color.Red);
 
-        if (VM.IsHalted) Raylib.DrawText("STOPPED", (int)drawX + 20, (int)drawY + 80, 20, Color.Red);
-        else if (VM.IsWaiting) Raylib.DrawText("WAITING...", (int)drawX + 20, (int)drawY + 80, 20, Color.Orange);
-        else Raylib.DrawText("RUNNING", (int)drawX + 20, (int)drawY + 80, 20, Color.Green);
+        if (unlockedLvl == 0) Program.DrawText("NEEDS CODING", drawX + 15, drawY + 80, 20, Color.Red);
+        else if (VM.IsHalted) Program.DrawText("STOPPED/ERR", drawX + 20, drawY + 80, 20, Color.Red);
+        else if (HasMissingMaterials) Program.DrawText("NO MATERIALS!", drawX + 15, drawY + 80, 20, Color.Orange);
+        else Program.DrawText("PRODUCING", drawX + 20, drawY + 80, 20, Color.Green);
             
-        Raylib.DrawText($"Line: {VM.IP + 1}", (int)drawX + 20, (int)drawY + 110, 20, Color.LightGray);
+        Program.DrawText($"Line: {VM.IP + 1}", drawX + 20, drawY + 110, 20, Color.LightGray);
     }
 }

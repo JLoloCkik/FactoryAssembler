@@ -28,12 +28,12 @@ public static class GameState
 
     public static List<CardBlueprint> Blueprints = new List<CardBlueprint>()
     {
-        new CardBlueprint { Name = "Coal Miner", Color = new Color(50, 50, 50, 255), Cost = 50, Description = "Mines: Coal" },
-        new CardBlueprint { Name = "Iron Miner", Color = new Color(200, 120, 50, 255), Cost = 150, Description = "Mines: Iron Ore" },
-        new CardBlueprint { Name = "Copper Miner", Color = new Color(200, 80, 40, 255), Cost = 150, Description = "Mines: Copper Ore" },
-        new CardBlueprint { Name = "Smelter", Color = new Color(230, 41, 55, 255), Cost = 200, Description = "Cost: 1 Ore + 1 Coal\nMakes: Ingot" },
-        new CardBlueprint { Name = "Assembler", Color = new Color(0, 228, 48, 255), Cost = 500, Description = "Cost: 2 Iron Ingot\nMakes: Gear" },
-        new CardBlueprint { Name = "Rocket Silo", Color = new Color(200, 0, 200, 255), Cost = 2000, Description = "Cost: 10 Gear + 10 Copper Ingot\nMakes: ROCKET (WIN)" }
+        new CardBlueprint { Name = "Coal Miner", Color = new Color(50, 50, 50, 255), Cost = 50, Description = "Mines: Coal\nTime: 1s" },
+        new CardBlueprint { Name = "Iron Miner", Color = new Color(200, 120, 50, 255), Cost = 150, Description = "Mines: Iron Ore\nTime: 5s" },
+        new CardBlueprint { Name = "Copper Miner", Color = new Color(200, 80, 40, 255), Cost = 150, Description = "Mines: Copper Ore\nTime: 5s" },
+        new CardBlueprint { Name = "Smelter", Color = new Color(230, 41, 55, 255), Cost = 200, Description = "Requires: 1 Ore + 1 Coal\nMakes: Ingot" },
+        new CardBlueprint { Name = "Assembler", Color = new Color(0, 228, 48, 255), Cost = 500, Description = "Requires: 2 Iron Ingot\nMakes: Gear" },
+        new CardBlueprint { Name = "Rocket Silo", Color = new Color(200, 0, 200, 255), Cost = 2000, Description = "Req: 10 Gear + 10 Cu Ingot\nMakes: ROCKET (WIN!)" }
     };
 
     public static Dictionary<string, int> GlobalUnlocks = new Dictionary<string, int>();
