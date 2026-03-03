@@ -26,7 +26,8 @@ public class MarketUI
 
             if (Raylib.CheckCollisionPointRec(mouse, new Rectangle(winX + winW - 50, winY + 10, 40, 40))) Close();
 
-            int itemY = winY + 100;
+            // ITT VOLT A HIBA: Az Update-ben 100 volt, a Draw-ban 160. Most már mindkettő 160!
+            int itemY = winY + 160; 
             foreach (var item in GameState.Inventory)
             {
                 if (item.Key == "Rocket") continue; 

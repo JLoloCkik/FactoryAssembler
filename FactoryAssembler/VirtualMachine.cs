@@ -5,7 +5,6 @@ namespace FactoryAssembler;
 
 public class VirtualMachine
 {
-    // EZ HIÁNYZOTT AZ ELŐBB:
     public Action<int>? OnOutput; 
     
     public Dictionary<string, int> Registers { get; private set; } = new Dictionary<string, int>();
@@ -37,8 +36,14 @@ public class VirtualMachine
         {
             string cleanLine = line.Split('#')[0].Trim().ToUpper();
             if (string.IsNullOrEmpty(cleanLine)) continue;
-            if (cleanLine.EndsWith(":")) Labels[cleanLine.TrimEnd(':')] = realLineIndex;
-            else { Instructions.Add(cleanLine); realLineIndex++; }
+            
+            // Címkék mentése és MAGA A CÍMKE IS bekerül az utasítások közé "NOP" (No Operation) gyanánt
+            if (cleanLine.EndsWith(":")) 
+            {
+                Labels[cleanLine.TrimEnd(':')] = realLineIndex;
+            }
+            Instructions.Add(cleanLine); 
+            realLineIndex++;
         }
         IP = 0; IsHalted = false; LastError = "";
     }
@@ -47,17 +52,39 @@ public class VirtualMachine
     {
         if (IsHalted || Instructions.Count == 0) return;
         
-        if (IP >= Instructions.Count) IP = 0;
+        // Auto-loop ha kifutna
+        if (IP >= Instructions.Count) 
+        {
+            IP = 0; 
+            return; 
+        }
 
         try
         {
             string line = Instructions[IP];
             string[] parts = line.Split(new char[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
             string opcode = parts[0];
+
+            // Ha ez csak egy címke volt (pl. "START:"), ugorjuk át gond nélkül
+            if (opcode.EndsWith(":"))
+            {
+                IP++;
+                return;
+            }
+
             ExecuteOpcode(opcode, parts);
-            if (!opcode.StartsWith("J") && !IsWaiting) IP++;
+            
+            // Ha nem ugrás volt ÉS nem is várunk bemenetre, lépjünk a köv sorra
+            if (!opcode.StartsWith("J") && !IsWaiting) 
+            {
+                IP++;
+            }
         }
-        catch (Exception ex) { LastError = ex.Message; IsHalted = true; }
+        catch (Exception ex) 
+        { 
+            LastError = ex.Message; 
+            IsHalted = true; 
+        }
     }
 
     private void ExecuteOpcode(string opcode, string[] parts)
@@ -68,17 +95,53 @@ public class VirtualMachine
             case "ADD": Registers[parts[1]] += GetValue(parts[2]); break;
             case "SUB": Registers[parts[1]] -= GetValue(parts[2]); break;
             case "MUL": Registers[parts[1]] *= GetValue(parts[2]); break;
-            case "DIV": int d = GetValue(parts[2]); if(d==0) throw new Exception("Division by Zero!"); Registers[parts[1]] /= d; break;
-            case "CMP": int v1=GetValue(parts[1]); int v2=GetValue(parts[2]); CompareFlag=v1.CompareTo(v2); break;
-            case "JMP": if(Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; else throw new Exception($"Label {parts[1]} not found"); break;
-            case "JE": if(CompareFlag==0 && Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; else if(CompareFlag==0) throw new Exception($"Label {parts[1]} not found"); else IP++; break;
-            case "JG": if(CompareFlag>0 && Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; else if(CompareFlag>0) throw new Exception($"Label {parts[1]} not found"); else IP++; break;
-            case "JL": if(CompareFlag<0 && Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; else if(CompareFlag<0) throw new Exception($"Label {parts[1]} not found"); else IP++; break;
-            case "IN": if(InputBuffer.Count>0) { Registers[parts[1]]=InputBuffer.Dequeue(); IsWaiting=false; } else { IsWaiting=true; return; } break;
-            case "OUT": int val=GetValue(parts[1]); OutputBuffer.Enqueue(val); OnOutput?.Invoke(val); break;
-            default: throw new Exception($"Unknown command: {opcode}");
+            case "DIV": 
+                int d = GetValue(parts[2]); 
+                if(d==0) throw new Exception("Division by Zero!"); 
+                Registers[parts[1]] /= d; 
+                break;
+            case "CMP": 
+                int v1 = GetValue(parts[1]); 
+                int v2 = GetValue(parts[2]); 
+                CompareFlag = v1.CompareTo(v2); 
+                break;
+            case "JMP": 
+                if(Labels.ContainsKey(parts[1])) IP = Labels[parts[1]]; 
+                else throw new Exception($"Label {parts[1]} not found"); 
+                break;
+            case "JE": 
+                if(CompareFlag==0 && Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; 
+                else if(CompareFlag==0) throw new Exception($"Label {parts[1]} not found"); 
+                else IP++; 
+                break;
+            case "JG": 
+                if(CompareFlag>0 && Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; 
+                else if(CompareFlag>0) throw new Exception($"Label {parts[1]} not found"); 
+                else IP++; 
+                break;
+            case "JL": 
+                if(CompareFlag<0 && Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; 
+                else if(CompareFlag<0) throw new Exception($"Label {parts[1]} not found"); 
+                else IP++; 
+                break;
+            case "IN": 
+                if(InputBuffer.Count>0) { Registers[parts[1]]=InputBuffer.Dequeue(); IsWaiting=false; } 
+                else { IsWaiting=true; return; } 
+                break;
+            case "OUT": 
+                int val = GetValue(parts[1]); 
+                OutputBuffer.Enqueue(val); 
+                OnOutput?.Invoke(val); 
+                break;
+            default: 
+                throw new Exception($"Unknown command: {opcode}");
         }
     }
 
-    private int GetValue(string param) { if(int.TryParse(param, out int v)) return v; if(Registers.ContainsKey(param)) return Registers[param]; throw new Exception($"Invalid register/value: {param}"); }
+    private int GetValue(string param) 
+    { 
+        if(int.TryParse(param, out int v)) return v; 
+        if(Registers.ContainsKey(param)) return Registers[param]; 
+        throw new Exception($"Invalid register/value: {param}"); 
+    }
 }

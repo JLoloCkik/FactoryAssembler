@@ -75,7 +75,15 @@ public class FactoryGame
 
     public void Update()
     {
-        if (CurrentMode == GameMode.MainMenu) { UI.UpdateMainMenu(this); return; }
+        // FŐMENÜ LOGIKA BEKÖTÉSE INFO-HOZ
+        if (CurrentMode == GameMode.MainMenu) { 
+            if (UI.ShowInfoPanel) {
+                if (Raylib.IsKeyPressed(KeyboardKey.Escape) || Raylib.IsMouseButtonPressed(MouseButton.Left)) UI.ShowInfoPanel = false;
+            } else {
+                UI.UpdateMainMenu(this); 
+            }
+            return; 
+        }
 
         int screenW = Raylib.GetScreenWidth(); int screenH = Raylib.GetScreenHeight();
         Vector2 mouseScreen = Raylib.GetMousePosition(); Vector2 mouseWorld = Raylib.GetScreenToWorld2D(mouseScreen, Camera);

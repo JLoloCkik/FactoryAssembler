@@ -23,14 +23,15 @@ public class EditorUI
     private string FeedbackMsg = ""; private Color FeedbackColor = Color.White;
     private string LastTestInput = ""; private string LastTestOutput = ""; private string LastErrorMsg = "";
 
-    private const int Y_LVL_1 = 110;
-    private const int Y_LVL_2 = 180;
-    private const int Y_LVL_3 = 250;
-    private const int Y_GOAL = 330;
-    private const int H_GOAL = 120;
-    private const int Y_TEST = 460;
+    // FIX KOORDINÁTÁK
+    private const int Y_LVL_1 = 80;
+    private const int Y_LVL_2 = 140;
+    private const int Y_LVL_3 = 200;
+    private const int Y_GOAL = 270;
+    private const int H_GOAL = 140; // Megnövelt hely!
+    private const int Y_TEST = 420;
     private const int H_TEST = 120;
-    private const int Y_RUN = 600;
+    private const int Y_RUN = 550;
     private const int H_RUN = 60;
 
     public void Open(Card card) {
@@ -178,10 +179,13 @@ public class EditorUI
         
         int margin = 50; int editorW = (screenW / 2) - margin; int editorH = screenH - (margin * 2);
 
+        // --- BAL OLDAL (EDITOR) + VÁGÓMASZK (SCISSOR MODE) ---
         Raylib.DrawRectangle(margin, margin, editorW, editorH, new Color(20, 20, 20, 255));
         Raylib.DrawRectangleLines(margin, margin, editorW, editorH, Color.White);
         Program.DrawText($"EDITING: {CurrentCard.Name}", margin + 20, margin + 20, 35, CurrentCard.HeaderColor);
 
+        // Vágómaszk: innen kezdve semmi nem rajzolódik a dobozon kívül!
+        Raylib.BeginScissorMode(margin + 5, margin + 70, editorW - 10, editorH - 80);
         int lineY = margin + 80;
         for (int i = 0; i < Lines.Count; i++) {
             Program.DrawText($"{i+1}.", margin + 15, lineY, 24, Color.Gray);
@@ -192,7 +196,9 @@ public class EditorUI
             }
             lineY += 30;
         }
+        Raylib.EndScissorMode(); // Vágómaszk vége
 
+        // --- JOBB OLDAL ---
         int panelX = screenW / 2; int rightMargin = 50; int contentWidth = 600;
         Program.DrawText("SELECT DIFFICULTY LEVEL", panelX + rightMargin, margin + 20, 30, Color.White);
         
@@ -200,60 +206,66 @@ public class EditorUI
         DrawLevelBtn(panelX + rightMargin, Y_LVL_2, contentWidth, "NORMAL (x2) - Logic", 2);
         DrawLevelBtn(panelX + rightMargin, Y_LVL_3, contentWidth, "HARD (x4) - Math", 4);
 
+        int refY = Y_GOAL; // Command ref kezdete, ha nincs aktív task
+
         if (IsTaskActive) {
+            // GOAL DOBOZ (Vágómaszkkal)
             Raylib.DrawRectangle(panelX + rightMargin, Y_GOAL, contentWidth, H_GOAL, new Color(40, 40, 40, 255));
             Raylib.DrawRectangleLines(panelX + rightMargin, Y_GOAL, contentWidth, H_GOAL, Color.Yellow);
             Program.DrawText("GOAL:", panelX + rightMargin + 20, Y_GOAL + 15, 24, Color.Yellow);
-            Program.DrawText(CurrentTaskTitle, panelX + rightMargin + 20, Y_GOAL + 45, 28, Color.White);
+            
+            Raylib.BeginScissorMode(panelX + rightMargin, Y_GOAL + 40, contentWidth, H_GOAL - 40);
+            Program.DrawText(CurrentTaskTitle, panelX + rightMargin + 20, Y_GOAL + 45, 26, Color.White);
             string wrappedDesc = Program.WordWrap(CurrentTaskDesc, 22, contentWidth - 40);
-            int dy = Y_GOAL + 80; foreach (var line in wrappedDesc.Split('\n')) { Program.DrawText(line, panelX + rightMargin + 20, dy, 22, Color.LightGray); dy += 28; }
+            int dy = Y_GOAL + 80; foreach (var line in wrappedDesc.Split('\n')) { Program.DrawText(line, panelX + rightMargin + 20, dy, 22, Color.LightGray); dy += 25; }
+            Raylib.EndScissorMode();
 
+            // TEST RESULTS DOBOZ (Vágómaszkkal)
             Raylib.DrawRectangle(panelX + rightMargin, Y_TEST, contentWidth, H_TEST, new Color(20, 20, 30, 255));
             Raylib.DrawRectangleLines(panelX + rightMargin, Y_TEST, contentWidth, H_TEST, Color.Blue);
+            
+            Raylib.BeginScissorMode(panelX + rightMargin, Y_TEST, contentWidth, H_TEST);
             Program.DrawText($"Test Input: {LastTestInput}", panelX + rightMargin + 20, Y_TEST + 15, 22, Color.LightGray);
             Program.DrawText($"Your Output: {LastTestOutput}", panelX + rightMargin + 20, Y_TEST + 45, 22, Color.White);
             Color errCol = LastErrorMsg == "No errors." ? Color.Green : Color.Red;
             Program.DrawText($"Status: {LastErrorMsg}", panelX + rightMargin + 20, Y_TEST + 75, 22, errCol);
+            Raylib.EndScissorMode();
 
+            // RUN BUTTON
             Raylib.DrawRectangle(panelX + rightMargin, Y_RUN, 200, H_RUN, new Color(0, 100, 0, 255));
             Program.DrawText("RUN TESTS", panelX + rightMargin + 30, Y_RUN + 15, 26, Color.White);
             if (!string.IsNullOrEmpty(FeedbackMsg)) Program.DrawText(FeedbackMsg, panelX + rightMargin + 220, Y_RUN + 15, 30, FeedbackColor);
+
+            refY = Y_RUN + H_RUN + 20; // Command list csúsztatása a gomb alá
         } 
 
-        int refY = IsTaskActive ? Y_RUN + 80 : Y_GOAL; 
+        // COMMAND REFERENCE (Vágómaszkkal, így alul sem fog soha kilógni a képernyőről)
         int refH = screenH - refY - margin; 
-        
         Program.DrawText("COMMAND REFERENCE (How to code)", panelX + rightMargin, refY, 26, Color.Gold);
         Raylib.DrawRectangle(panelX + rightMargin, refY + 35, contentWidth, refH - 35, new Color(30, 30, 40, 255));
         Raylib.DrawRectangleLines(panelX + rightMargin, refY + 35, contentWidth, refH - 35, Color.Gray);
         
+        Raylib.BeginScissorMode(panelX + rightMargin, refY + 35, contentWidth, refH - 35);
         string[] cmds = { 
-            "AX, BX, CX : Variables (Registers)",
-            "MOV A, B   : Sets A to B. (MOV AX, 5)", 
-            "ADD A, B   : Adds B to A. (ADD AX, 2)", 
-            "SUB A, B   : Subtracts B from A.", 
-            "MUL A, B   : Multiplies A by B.", 
-            "DIV A, B   : Divides A by B.", 
-            "IN A       : Reads input to A.", 
-            "OUT A      : Sends A to output.", 
-            "CMP A, B   : Compares A and B.", 
-            "JE LBL     : Jumps to LBL if A == B.", 
-            "JG LBL     : Jumps if A > B.",
-            "JL LBL     : Jumps if A < B.",
-            "JMP LBL    : Jumps always.", 
-            "LBL:       : Defines a line name." 
+            "AX, BX, CX : Variables (Registers)", "MOV A, B   : Sets A to B. (MOV AX, 5)", 
+            "ADD A, B   : Adds B to A. (ADD AX, 2)", "SUB A, B   : Subtracts B from A.", 
+            "MUL A, B   : Multiplies A by B.", "DIV A, B   : Divides A by B.", 
+            "IN A       : Reads input to A.", "OUT A      : Sends A to output.", 
+            "CMP A, B   : Compares A and B.", "JE LBL     : Jumps to LBL if A == B.", 
+            "JG LBL     : Jumps if A > B.", "JL LBL     : Jumps if A < B.",
+            "JMP LBL    : Jumps always.", "LBL:       : Defines a line name." 
         };
         
         int fontSizeCmd = IsTaskActive ? 16 : 20;
         int spacingCmd = IsTaskActive ? 22 : 28;
         int cy = refY + 45; 
-        
         foreach(var c in cmds) { 
             string[] parts = c.Split(new[] { " : " }, StringSplitOptions.None);
             Program.DrawText(parts[0], panelX + rightMargin + 10, cy, fontSizeCmd, Color.Yellow);
             if (parts.Length > 1) Program.DrawText("- " + parts[1], panelX + rightMargin + 140, cy, fontSizeCmd, Color.LightGray);
             cy += spacingCmd; 
         }
+        Raylib.EndScissorMode();
         
         cursorTimer += Raylib.GetFrameTime(); if (cursorTimer >= 0.5f) { cursorTimer = 0; cursorVisible = !cursorVisible; }
     }
@@ -264,8 +276,8 @@ public class EditorUI
         Color col = (unlocked >= level) ? Color.DarkGreen : Color.DarkGray;
         if (IsTaskActive && TargetLevel == level) col = Color.Blue; 
 
-        Raylib.DrawRectangle(x, y, w, 60, col);
-        Program.DrawText(text, x + 20, y + 15, 26, Color.White);
-        if (unlocked >= level) Program.DrawText("UNLOCKED", x + w - 150, y + 15, 26, Color.Lime);
+        Raylib.DrawRectangle(x, y, w, 50, col);
+        Program.DrawText(text, x + 20, y + 12, 24, Color.White);
+        if (unlocked >= level) Program.DrawText("UNLOCKED", x + w - 140, y + 12, 24, Color.Lime);
     }
 }
