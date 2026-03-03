@@ -2,6 +2,7 @@ using Raylib_cs;
 using System.Numerics;
 using System.IO;
 using System.Text.Json;
+using System; 
 
 namespace FactoryAssembler;
 
@@ -19,6 +20,7 @@ public class FactoryGame
     private Card? draggedCard = null;
     private Vector2 dragOffset = Vector2.Zero;
     private float tickTimer = 0f;
+    private Random rng = new Random(); 
 
     public FactoryGame()
     {
@@ -29,9 +31,10 @@ public class FactoryGame
         Market = new MarketUI();
     }
 
-    public void StartNewGame()
+    // ÚJ: A StartNewGame most már paramétert vár!
+    public void StartNewGame(Difficulty diff)
     {
-        GameState.ResetGame();
+        GameState.ResetGame(diff);
         Grid.PlacedCards.Clear();
         Card marketCard = new Card("MARKET", 25, 25, Color.Gold) { WidthSlots = 2, HeightSlots = 2 };
         Grid.AddCard(marketCard);
@@ -46,6 +49,7 @@ public class FactoryGame
         GameSaveData data = JsonSerializer.Deserialize<GameSaveData>(json);
         
         if (data != null) {
+            GameState.CurrentDifficulty = (Difficulty)data.Difficulty; // Nehézség betöltése
             GameState.Credits = data.Credits; GameState.CurrentQuestIndex = data.QuestIndex;
             GameState.Inventory = data.Inventory; GameState.GlobalUnlocks = data.Unlocks;
             Editor.GlobalUnlocks = GameState.GlobalUnlocks; 
@@ -55,12 +59,30 @@ public class FactoryGame
                 if (cData.Name == "MARKET" || cData.Name == "HUB") { cData.Name = "MARKET"; cColor = Color.Gold; w = 2; h = 2; }
                 else { foreach(var bp in GameState.Blueprints) if(bp.Name == cData.Name) cColor = bp.Color; }
                 Card card = new Card(cData.Name, cData.X, cData.Y, cColor) { WidthSlots = w, HeightSlots = h };
-                card.CurrentMultiplier = GameState.GlobalUnlocks.GetValueOrDefault(card.Name, 1);
+                
+                int unlocked = GameState.GlobalUnlocks.ContainsKey(card.Name) ? GameState.GlobalUnlocks[card.Name] : 0;
+                card.CurrentMultiplier = (unlocked == 0) ? 1 : unlocked;
                 card.VM.LoadCode(string.Join("\n", cData.Instructions));
+                
                 Grid.AddCard(card);
             }
             Camera.Target = new Vector2(25 * 240 + 240, 25 * 320 + 320); 
             CurrentMode = GameMode.Playing;
+        }
+    }
+
+    private void InitMachineCodeIfUnlocked(Card card)
+    {
+        int unlockedLvl = GameState.GlobalUnlocks.GetValueOrDefault(card.Name, 0);
+        card.CurrentMultiplier = (unlockedLvl == 0) ? 1 : unlockedLvl;
+
+        if (card.VM.Instructions.Count == 0 && unlockedLvl > 0)
+        {
+            string autoCode = "";
+            if (card.Name.Contains("Miner")) autoCode = "START:\nMOV AX, 1\nOUT AX\nJMP START";
+            else if (card.Name != "MARKET") autoCode = "START:\nIN AX\nOUT AX\nJMP START";
+            
+            if (autoCode != "") card.VM.LoadCode(autoCode);
         }
     }
 
@@ -89,7 +111,6 @@ public class FactoryGame
         
         bool isMouseOnUI = mouseScreen.X > screenW - 250 || Editor.IsVisible || Market.IsVisible || UI.ShowInfoPanel || GameState.Inventory["Rocket"] >= 1;
 
-        // FELGYORSÍTOTT TICK (0.2 mp)
         if (!Editor.IsVisible && !Market.IsVisible && GameState.Inventory["Rocket"] == 0)
         {
             tickTimer += Raylib.GetFrameTime();
@@ -98,29 +119,57 @@ public class FactoryGame
                 tickTimer = 0;
                 foreach (var card in Grid.PlacedCards) {
                     if (card.Name == "MARKET") continue;
+                    
                     int unlockedLvl = GameState.GlobalUnlocks.GetValueOrDefault(card.Name, 0);
+                    card.CurrentMultiplier = (unlockedLvl == 0) ? 1 : unlockedLvl;
+
                     if (unlockedLvl > 0) {
-                        while (card.VM.InputBuffer.Count < 5) card.VM.InputBuffer.Enqueue(1); 
+                        if (card.VM.IsHalted) card.VM.Reset();
+                        if (card.VM.Instructions.Count == 0) InitMachineCodeIfUnlocked(card);
+
+                        while (card.VM.InputBuffer.Count < 50) card.VM.InputBuffer.Enqueue(rng.Next(1, 100)); 
+                        
                         for (int i = 0; i < card.CurrentMultiplier; i++) card.VM.Step();
                     }
 
                     while (card.VM.OutputBuffer.Count > 0)
                     {
                         card.VM.OutputBuffer.Dequeue(); 
+                        
                         if (card.Name == "Coal Miner") GameState.Inventory["Coal"]++;
                         else if (card.Name == "Iron Miner") GameState.Inventory["Iron Ore"]++;
                         else if (card.Name == "Copper Miner") GameState.Inventory["Copper Ore"]++;
                         else if (card.Name == "Smelter") {
-                            if (GameState.Inventory["Iron Ore"] > 0 && GameState.Inventory["Coal"] > 0) { GameState.Inventory["Iron Ore"]--; GameState.Inventory["Coal"]--; GameState.Inventory["Iron Ingot"]++; } 
-                            else if (GameState.Inventory["Copper Ore"] > 0 && GameState.Inventory["Coal"] > 0) { GameState.Inventory["Copper Ore"]--; GameState.Inventory["Coal"]--; GameState.Inventory["Copper Ingot"]++; } 
-                            else card.HasMissingMaterials = true;
+                            int ironOre = GameState.Inventory["Iron Ore"];
+                            int copperOre = GameState.Inventory["Copper Ore"];
+                            int coal = GameState.Inventory["Coal"];
+                            bool crafted = false;
+
+                            if (copperOre > ironOre && copperOre > 0 && coal > 0) {
+                                GameState.Inventory["Copper Ore"]--; GameState.Inventory["Coal"]--; GameState.Inventory["Copper Ingot"]++;
+                                crafted = true;
+                            }
+                            else if (ironOre > 0 && coal > 0) {
+                                GameState.Inventory["Iron Ore"]--; GameState.Inventory["Coal"]--; GameState.Inventory["Iron Ingot"]++;
+                                crafted = true;
+                            }
+                            else if (copperOre > 0 && coal > 0) {
+                                GameState.Inventory["Copper Ore"]--; GameState.Inventory["Coal"]--; GameState.Inventory["Copper Ingot"]++;
+                                crafted = true;
+                            }
+
+                            if (!crafted) card.HasMissingMaterials = true;
+                            else card.HasMissingMaterials = false;
                         }
                         else if (card.Name == "Assembler") {
-                            if (GameState.Inventory["Iron Ingot"] >= 2) { GameState.Inventory["Iron Ingot"] -= 2; GameState.Inventory["Gear"]++; } 
+                            if (GameState.Inventory["Iron Ingot"] >= 2) { GameState.Inventory["Iron Ingot"] -= 2; GameState.Inventory["Gear"]++; card.HasMissingMaterials = false; } 
                             else card.HasMissingMaterials = true;
                         }
                         else if (card.Name == "Rocket Silo") {
-                            if (GameState.Inventory["Gear"] >= 10 && GameState.Inventory["Copper Ingot"] >= 10) { GameState.Inventory["Gear"] -= 10; GameState.Inventory["Copper Ingot"] -= 10; GameState.Inventory["Rocket"]++; } 
+                            if (GameState.Inventory["Gear"] >= 10 && GameState.Inventory["Copper Ingot"] >= 10) { 
+                                GameState.Inventory["Gear"] -= 10; GameState.Inventory["Copper Ingot"] -= 10; GameState.Inventory["Rocket"]++; 
+                                card.HasMissingMaterials = false;
+                            } 
                             else card.HasMissingMaterials = true;
                         }
                     }
@@ -138,37 +187,48 @@ public class FactoryGame
 
             Card? hoveredCard = GetCardAtPoint(mouseWorld);
 
+            // TÖRLÉS - VISSZATÉRÍTÉS A NEHÉZSÉG ALAPJÁN
             if (Raylib.IsKeyPressed(KeyboardKey.Delete) || Raylib.IsKeyPressed(KeyboardKey.Backspace)) {
                 if (hoveredCard != null && hoveredCard.Name != "MARKET") {
-                    foreach (var bp in GameState.Blueprints) if (bp.Name == hoveredCard.Name) GameState.Credits += bp.Cost;
+                    foreach (var bp in GameState.Blueprints) if (bp.Name == hoveredCard.Name) {
+                        int cost = (int)(bp.Cost * GameState.CostMultiplier); // Kalkulált ár visszatérítése
+                        GameState.Credits += cost;
+                    }
                     Grid.PlacedCards.Remove(hoveredCard);
                 }
             }
 
+            // VÁSÁRLÁS - NEHÉZSÉG ALAPJÁN
             if (isMouseOnUI && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
                 for (int i = 0; i < GameState.Blueprints.Count; i++) {
                     if (Raylib.CheckCollisionPointRec(mouseScreen, new Rectangle(screenW - 240, 110 + (i * 90), 230, 70))) {
                         var bp = GameState.Blueprints[i];
-                        if (GameState.Credits >= bp.Cost) {
-                            GameState.Credits -= bp.Cost;
+                        int actualCost = (int)(bp.Cost * GameState.CostMultiplier); // <--- ITT A LÉNYEG!
+
+                        if (GameState.Credits >= actualCost) {
+                            GameState.Credits -= actualCost;
                             Card newCard = new Card(bp.Name, 0, 0, bp.Color);
-                            newCard.CurrentMultiplier = GameState.GlobalUnlocks.GetValueOrDefault(bp.Name, 1);
+                            InitMachineCodeIfUnlocked(newCard);
                             draggedCard = newCard; Grid.AddCard(newCard);
                             dragOffset = new Vector2(Grid.CardWidth / 2, Grid.CardHeight / 2);
                         }
                     }
                 }
             }
+            // MOZGATÁS / KLÓNOZÁS
             else if (!isMouseOnUI && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
                 if (hoveredCard != null && hoveredCard.Name != "MARKET") {
-                    int cost = 0; foreach(var bp in GameState.Blueprints) if(bp.Name==hoveredCard.Name) cost=bp.Cost;
+                    int baseCost = 0; foreach(var bp in GameState.Blueprints) if(bp.Name==hoveredCard.Name) baseCost=bp.Cost;
+                    int actualCost = (int)(baseCost * GameState.CostMultiplier); // <--- KLÓNOZÁSNÁL IS!
+
                     bool ctrl = Raylib.IsKeyDown(KeyboardKey.LeftControl);
 
-                    if (ctrl && GameState.Credits >= cost) {
-                        GameState.Credits -= cost;
+                    if (ctrl && GameState.Credits >= actualCost) {
+                        GameState.Credits -= actualCost;
                         Card clone = new Card(hoveredCard.Name, hoveredCard.GridX, hoveredCard.GridY, hoveredCard.HeaderColor);
                         clone.VM.LoadCode(string.Join("\n", hoveredCard.VM.Instructions));
-                        clone.CurrentMultiplier = GameState.GlobalUnlocks.GetValueOrDefault(clone.Name, 1);
+                        int unlocked = GameState.GlobalUnlocks.ContainsKey(clone.Name) ? GameState.GlobalUnlocks[clone.Name] : 0;
+                        clone.CurrentMultiplier = (unlocked == 0) ? 1 : unlocked;
                         Grid.AddCard(clone); draggedCard = clone;
                     }
                     else if (!ctrl) draggedCard = hoveredCard;

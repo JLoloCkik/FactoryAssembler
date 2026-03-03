@@ -5,6 +5,8 @@ using System.Text.Json;
 
 namespace FactoryAssembler;
 
+public enum Difficulty { Relaxed, Standard, Challenge }
+
 public struct CardBlueprint
 {
     public string Name; public Color Color; public int Cost; public string Description;
@@ -22,6 +24,7 @@ public class GameSaveData
 {
     public int Credits { get; set; }
     public int QuestIndex { get; set; }
+    public int Difficulty { get; set; } // Mentjük a nehézséget is!
     public Dictionary<string, int> Inventory { get; set; } = new();
     public Dictionary<string, int> Unlocks { get; set; } = new();
     public List<CardSaveData> Cards { get; set; } = new();
@@ -38,6 +41,23 @@ public class CardSaveData
 public static class GameState
 {
     public static int Credits = 100; 
+    public static Difficulty CurrentDifficulty = Difficulty.Standard; // Alapértelmezett
+
+    // Dinamikus Ár-szorzó a nehézség alapján
+    public static float CostMultiplier 
+    {
+        get 
+        {
+            return CurrentDifficulty switch 
+            {
+                Difficulty.Relaxed => 0.5f,   // Féláron
+                Difficulty.Standard => 1.0f,  // Normál
+                Difficulty.Challenge => 2.5f, // Drága! (Grind vagy Code!)
+                _ => 1.0f
+            };
+        }
+    }
+
     public static Dictionary<string, int> Inventory = new Dictionary<string, int>();
     public static Dictionary<string, int> GlobalUnlocks = new Dictionary<string, int>();
     public static List<Quest> Quests = QuestDatabase.GetQuests();
@@ -46,7 +66,7 @@ public static class GameState
     public static Dictionary<string, int> Prices = new Dictionary<string, int>()
     {
         {"Coal", 1}, {"Iron Ore", 2}, {"Copper Ore", 2},
-        {"Iron Ingot", 6}, {"Copper Ingot", 6}, {"Wall", 10}, {"Gear", 15}, {"Rocket", 0} 
+        {"Iron Ingot", 6}, {"Copper Ingot", 6}, {"Gear", 15}, {"Rocket", 0} 
     };
 
     public static List<CardBlueprint> Blueprints = new List<CardBlueprint>()
@@ -59,15 +79,16 @@ public static class GameState
         new CardBlueprint { Name = "Rocket Silo", Color = new Color(200, 0, 200, 255), Cost = 2000, Description = "Req: 10 Gear + 10 Cu Ingot\nMakes: ROCKET (WIN!)" }
     };
 
-    public static void ResetGame()
+    public static void ResetGame(Difficulty difficulty)
     {
-        Credits = 100;
+        CurrentDifficulty = difficulty;
+        Credits = (int)(100 * (difficulty == Difficulty.Relaxed ? 2.0f : 1.0f)); // Relaxedben több pénzzel kezdesz
         CurrentQuestIndex = 0;
         GlobalUnlocks.Clear();
         Inventory.Clear();
         Inventory.Add("Coal", 0); Inventory.Add("Iron Ore", 0); Inventory.Add("Copper Ore", 0);
         Inventory.Add("Iron Ingot", 0); Inventory.Add("Copper Ingot", 0); 
-        Inventory.Add("Wall", 0); Inventory.Add("Gear", 0); Inventory.Add("Rocket", 0);
+        Inventory.Add("Gear", 0); Inventory.Add("Rocket", 0);
     }
 
     public static void SaveGame(FactoryGrid grid)
@@ -76,6 +97,7 @@ public static class GameState
         {
             Credits = Credits,
             QuestIndex = CurrentQuestIndex,
+            Difficulty = (int)CurrentDifficulty,
             Inventory = Inventory,
             Unlocks = GlobalUnlocks
         };
