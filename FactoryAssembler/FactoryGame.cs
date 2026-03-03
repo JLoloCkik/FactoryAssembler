@@ -75,7 +75,6 @@ public class FactoryGame
 
     public void Update()
     {
-        // FŐMENÜ LOGIKA BEKÖTÉSE INFO-HOZ
         if (CurrentMode == GameMode.MainMenu) { 
             if (UI.ShowInfoPanel) {
                 if (Raylib.IsKeyPressed(KeyboardKey.Escape) || Raylib.IsMouseButtonPressed(MouseButton.Left)) UI.ShowInfoPanel = false;
@@ -90,10 +89,11 @@ public class FactoryGame
         
         bool isMouseOnUI = mouseScreen.X > screenW - 250 || Editor.IsVisible || Market.IsVisible || UI.ShowInfoPanel || GameState.Inventory["Rocket"] >= 1;
 
+        // FELGYORSÍTOTT TICK (0.2 mp)
         if (!Editor.IsVisible && !Market.IsVisible && GameState.Inventory["Rocket"] == 0)
         {
             tickTimer += Raylib.GetFrameTime();
-            if (tickTimer >= 1.0f)
+            if (tickTimer >= 0.2f)
             {
                 tickTimer = 0;
                 foreach (var card in Grid.PlacedCards) {

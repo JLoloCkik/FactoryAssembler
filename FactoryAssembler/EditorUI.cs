@@ -23,12 +23,12 @@ public class EditorUI
     private string FeedbackMsg = ""; private Color FeedbackColor = Color.White;
     private string LastTestInput = ""; private string LastTestOutput = ""; private string LastErrorMsg = "";
 
-    // FIX KOORDINÁTÁK
+    // --- FIX KOORDINÁTÁK VISSZAÁLLÍTVA ---
     private const int Y_LVL_1 = 80;
     private const int Y_LVL_2 = 140;
     private const int Y_LVL_3 = 200;
     private const int Y_GOAL = 270;
-    private const int H_GOAL = 140; // Megnövelt hely!
+    private const int H_GOAL = 140;
     private const int Y_TEST = 420;
     private const int H_TEST = 120;
     private const int Y_RUN = 550;
@@ -67,9 +67,9 @@ public class EditorUI
         if (Raylib.IsMouseButtonPressed(MouseButton.Left)) {
             Vector2 mouse = Raylib.GetMousePosition(); int panelX = Raylib.GetScreenWidth() / 2; int rightMargin = 50;
             
-            if (Raylib.CheckCollisionPointRec(mouse, new Rectangle(panelX + rightMargin, Y_LVL_1, 600, 60))) StartTask(1); 
-            else if (Raylib.CheckCollisionPointRec(mouse, new Rectangle(panelX + rightMargin, Y_LVL_2, 600, 60))) StartTask(2); 
-            else if (Raylib.CheckCollisionPointRec(mouse, new Rectangle(panelX + rightMargin, Y_LVL_3, 600, 60))) StartTask(4); 
+            if (Raylib.CheckCollisionPointRec(mouse, new Rectangle(panelX + rightMargin, Y_LVL_1, 600, 50))) StartTask(1); 
+            else if (Raylib.CheckCollisionPointRec(mouse, new Rectangle(panelX + rightMargin, Y_LVL_2, 600, 50))) StartTask(2); 
+            else if (Raylib.CheckCollisionPointRec(mouse, new Rectangle(panelX + rightMargin, Y_LVL_3, 600, 50))) StartTask(4); 
 
             if (IsTaskActive && Raylib.CheckCollisionPointRec(mouse, new Rectangle(panelX + rightMargin, Y_RUN, 200, H_RUN))) VerifyCode();
         }
@@ -104,6 +104,10 @@ public class EditorUI
             if (level == 1) { CurrentTaskTitle = "EASY: Output 100"; CurrentTaskDesc = "Output 100 to prepare the launch."; }
             else if (level == 2) { CurrentTaskTitle = "NORMAL: Multiply Input by 2"; CurrentTaskDesc = "Read input. Multiply by 2. Output."; }
             else if (level == 4) { CurrentTaskTitle = "HARD: Fibonacci"; CurrentTaskDesc = "Output 1, 1, 2, 3, 5."; }
+        } else if (name == "MARKET") {
+            if (level == 1) { CurrentTaskTitle = "EASY: Accept All"; CurrentTaskDesc = "Just output 1."; }
+            else if (level == 2) { CurrentTaskTitle = "NORMAL: Filter"; CurrentTaskDesc = "Input must be 7 to pass."; }
+            else if (level == 4) { CurrentTaskTitle = "HARD: Strict"; CurrentTaskDesc = "Input must be 8 to pass."; }
         }
     }
 
@@ -131,7 +135,10 @@ public class EditorUI
         }
         while (vm.OutputBuffer.Count > 0) producedOutput.Add(vm.OutputBuffer.Dequeue());
 
-        LastTestOutput = producedOutput.Count > 0 ? string.Join(", ", producedOutput) : "Nothing";
+        if (producedOutput.Count > 10) LastTestOutput = string.Join(", ", producedOutput.GetRange(0, 10)) + "...";
+        else if (producedOutput.Count > 0) LastTestOutput = string.Join(", ", producedOutput);
+        else LastTestOutput = "Nothing";
+
         LastErrorMsg = vm.LastError != "" ? vm.LastError : "No errors.";
 
         try {
@@ -165,11 +172,10 @@ public class EditorUI
         if (vm.Instructions.Count == 0) success = false;
 
         if (success) { 
-            FeedbackMsg = "TEST PASSED!"; FeedbackColor = Color.Green; 
+            FeedbackMsg = "TEST PASSED! UNLOCKED!"; FeedbackColor = Color.Lime; 
             int currentLevel = GlobalUnlocks.GetValueOrDefault(CurrentCard.Name, 0);
             GlobalUnlocks[CurrentCard.Name] = Math.Max(currentLevel, TargetLevel); 
             CurrentCard.CurrentMultiplier = Math.Max(currentLevel, TargetLevel); 
-            IsTaskActive = false; 
         } else { FeedbackMsg = "FAILED! Check Logic."; FeedbackColor = Color.Red; }
     }
 
@@ -179,12 +185,11 @@ public class EditorUI
         
         int margin = 50; int editorW = (screenW / 2) - margin; int editorH = screenH - (margin * 2);
 
-        // --- BAL OLDAL (EDITOR) + VÁGÓMASZK (SCISSOR MODE) ---
+        // BAL OLDAL (EDITOR)
         Raylib.DrawRectangle(margin, margin, editorW, editorH, new Color(20, 20, 20, 255));
         Raylib.DrawRectangleLines(margin, margin, editorW, editorH, Color.White);
         Program.DrawText($"EDITING: {CurrentCard.Name}", margin + 20, margin + 20, 35, CurrentCard.HeaderColor);
 
-        // Vágómaszk: innen kezdve semmi nem rajzolódik a dobozon kívül!
         Raylib.BeginScissorMode(margin + 5, margin + 70, editorW - 10, editorH - 80);
         int lineY = margin + 80;
         for (int i = 0; i < Lines.Count; i++) {
@@ -196,9 +201,9 @@ public class EditorUI
             }
             lineY += 30;
         }
-        Raylib.EndScissorMode(); // Vágómaszk vége
+        Raylib.EndScissorMode();
 
-        // --- JOBB OLDAL ---
+        // JOBB OLDAL
         int panelX = screenW / 2; int rightMargin = 50; int contentWidth = 600;
         Program.DrawText("SELECT DIFFICULTY LEVEL", panelX + rightMargin, margin + 20, 30, Color.White);
         
@@ -206,10 +211,10 @@ public class EditorUI
         DrawLevelBtn(panelX + rightMargin, Y_LVL_2, contentWidth, "NORMAL (x2) - Logic", 2);
         DrawLevelBtn(panelX + rightMargin, Y_LVL_3, contentWidth, "HARD (x4) - Math", 4);
 
-        int refY = Y_GOAL; // Command ref kezdete, ha nincs aktív task
+        int refY = Y_GOAL; 
 
         if (IsTaskActive) {
-            // GOAL DOBOZ (Vágómaszkkal)
+            // GOAL
             Raylib.DrawRectangle(panelX + rightMargin, Y_GOAL, contentWidth, H_GOAL, new Color(40, 40, 40, 255));
             Raylib.DrawRectangleLines(panelX + rightMargin, Y_GOAL, contentWidth, H_GOAL, Color.Yellow);
             Program.DrawText("GOAL:", panelX + rightMargin + 20, Y_GOAL + 15, 24, Color.Yellow);
@@ -220,7 +225,7 @@ public class EditorUI
             int dy = Y_GOAL + 80; foreach (var line in wrappedDesc.Split('\n')) { Program.DrawText(line, panelX + rightMargin + 20, dy, 22, Color.LightGray); dy += 25; }
             Raylib.EndScissorMode();
 
-            // TEST RESULTS DOBOZ (Vágómaszkkal)
+            // TEST RESULTS
             Raylib.DrawRectangle(panelX + rightMargin, Y_TEST, contentWidth, H_TEST, new Color(20, 20, 30, 255));
             Raylib.DrawRectangleLines(panelX + rightMargin, Y_TEST, contentWidth, H_TEST, Color.Blue);
             
@@ -236,10 +241,10 @@ public class EditorUI
             Program.DrawText("RUN TESTS", panelX + rightMargin + 30, Y_RUN + 15, 26, Color.White);
             if (!string.IsNullOrEmpty(FeedbackMsg)) Program.DrawText(FeedbackMsg, panelX + rightMargin + 220, Y_RUN + 15, 30, FeedbackColor);
 
-            refY = Y_RUN + H_RUN + 20; // Command list csúsztatása a gomb alá
+            refY = Y_RUN + H_RUN + 20; 
         } 
 
-        // COMMAND REFERENCE (Vágómaszkkal, így alul sem fog soha kilógni a képernyőről)
+        // COMMAND REFERENCE
         int refH = screenH - refY - margin; 
         Program.DrawText("COMMAND REFERENCE (How to code)", panelX + rightMargin, refY, 26, Color.Gold);
         Raylib.DrawRectangle(panelX + rightMargin, refY + 35, contentWidth, refH - 35, new Color(30, 30, 40, 255));

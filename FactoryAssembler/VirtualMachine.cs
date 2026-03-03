@@ -30,14 +30,16 @@ public class VirtualMachine
     {
         Instructions.Clear(); Labels.Clear();
         if (string.IsNullOrWhiteSpace(rawCode)) return;
-        string[] lines = rawCode.Split('\n');
+        
+        string[] lines = rawCode.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
         int realLineIndex = 0;
+        
         foreach (var line in lines)
         {
             string cleanLine = line.Split('#')[0].Trim().ToUpper();
             if (string.IsNullOrEmpty(cleanLine)) continue;
             
-            // Címkék mentése és MAGA A CÍMKE IS bekerül az utasítások közé "NOP" (No Operation) gyanánt
+            // Címke mentése, magát a sort megtartjuk (hogy a sortörés számolás jó legyen)
             if (cleanLine.EndsWith(":")) 
             {
                 Labels[cleanLine.TrimEnd(':')] = realLineIndex;
@@ -52,7 +54,6 @@ public class VirtualMachine
     {
         if (IsHalted || Instructions.Count == 0) return;
         
-        // Auto-loop ha kifutna
         if (IP >= Instructions.Count) 
         {
             IP = 0; 
@@ -63,9 +64,16 @@ public class VirtualMachine
         {
             string line = Instructions[IP];
             string[] parts = line.Split(new char[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
-            string opcode = parts[0];
+            
+            if (parts.Length == 0) 
+            {
+                IP++;
+                return;
+            }
 
-            // Ha ez csak egy címke volt (pl. "START:"), ugorjuk át gond nélkül
+            string opcode = parts[0].Trim();
+
+            // Ha ez egy címke sor (pl "START:"), lépjünk tovább
             if (opcode.EndsWith(":"))
             {
                 IP++;
@@ -74,7 +82,6 @@ public class VirtualMachine
 
             ExecuteOpcode(opcode, parts);
             
-            // Ha nem ugrás volt ÉS nem is várunk bemenetre, lépjünk a köv sorra
             if (!opcode.StartsWith("J") && !IsWaiting) 
             {
                 IP++;
@@ -91,45 +98,49 @@ public class VirtualMachine
     {
         switch (opcode)
         {
-            case "MOV": Registers[parts[1]] = GetValue(parts[2]); break;
-            case "ADD": Registers[parts[1]] += GetValue(parts[2]); break;
-            case "SUB": Registers[parts[1]] -= GetValue(parts[2]); break;
-            case "MUL": Registers[parts[1]] *= GetValue(parts[2]); break;
+            case "MOV": Registers[parts[1].Trim()] = GetValue(parts[2].Trim()); break;
+            case "ADD": Registers[parts[1].Trim()] += GetValue(parts[2].Trim()); break;
+            case "SUB": Registers[parts[1].Trim()] -= GetValue(parts[2].Trim()); break;
+            case "MUL": Registers[parts[1].Trim()] *= GetValue(parts[2].Trim()); break;
             case "DIV": 
-                int d = GetValue(parts[2]); 
-                if(d==0) throw new Exception("Division by Zero!"); 
-                Registers[parts[1]] /= d; 
+                int d = GetValue(parts[2].Trim()); 
+                if(d == 0) throw new Exception("Division by Zero!"); 
+                Registers[parts[1].Trim()] /= d; 
                 break;
             case "CMP": 
-                int v1 = GetValue(parts[1]); 
-                int v2 = GetValue(parts[2]); 
+                int v1 = GetValue(parts[1].Trim()); 
+                int v2 = GetValue(parts[2].Trim()); 
                 CompareFlag = v1.CompareTo(v2); 
                 break;
             case "JMP": 
-                if(Labels.ContainsKey(parts[1])) IP = Labels[parts[1]]; 
-                else throw new Exception($"Label {parts[1]} not found"); 
+                string lblJmp = parts[1].Trim();
+                if(Labels.ContainsKey(lblJmp)) IP = Labels[lblJmp]; 
+                else throw new Exception($"Label '{lblJmp}' not found"); 
                 break;
             case "JE": 
-                if(CompareFlag==0 && Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; 
-                else if(CompareFlag==0) throw new Exception($"Label {parts[1]} not found"); 
+                string lblJe = parts[1].Trim();
+                if(CompareFlag == 0 && Labels.ContainsKey(lblJe)) IP = Labels[lblJe]; 
+                else if(CompareFlag == 0) throw new Exception($"Label '{lblJe}' not found"); 
                 else IP++; 
                 break;
             case "JG": 
-                if(CompareFlag>0 && Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; 
-                else if(CompareFlag>0) throw new Exception($"Label {parts[1]} not found"); 
+                string lblJg = parts[1].Trim();
+                if(CompareFlag > 0 && Labels.ContainsKey(lblJg)) IP = Labels[lblJg]; 
+                else if(CompareFlag > 0) throw new Exception($"Label '{lblJg}' not found"); 
                 else IP++; 
                 break;
             case "JL": 
-                if(CompareFlag<0 && Labels.ContainsKey(parts[1])) IP=Labels[parts[1]]; 
-                else if(CompareFlag<0) throw new Exception($"Label {parts[1]} not found"); 
+                string lblJl = parts[1].Trim();
+                if(CompareFlag < 0 && Labels.ContainsKey(lblJl)) IP = Labels[lblJl]; 
+                else if(CompareFlag < 0) throw new Exception($"Label '{lblJl}' not found"); 
                 else IP++; 
                 break;
             case "IN": 
-                if(InputBuffer.Count>0) { Registers[parts[1]]=InputBuffer.Dequeue(); IsWaiting=false; } 
-                else { IsWaiting=true; return; } 
+                if(InputBuffer.Count > 0) { Registers[parts[1].Trim()] = InputBuffer.Dequeue(); IsWaiting = false; } 
+                else { IsWaiting = true; return; } 
                 break;
             case "OUT": 
-                int val = GetValue(parts[1]); 
+                int val = GetValue(parts[1].Trim()); 
                 OutputBuffer.Enqueue(val); 
                 OnOutput?.Invoke(val); 
                 break;
@@ -142,6 +153,6 @@ public class VirtualMachine
     { 
         if(int.TryParse(param, out int v)) return v; 
         if(Registers.ContainsKey(param)) return Registers[param]; 
-        throw new Exception($"Invalid register/value: {param}"); 
+        throw new Exception($"Invalid value: {param}"); 
     }
-}
+}   
