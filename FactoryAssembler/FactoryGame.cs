@@ -31,11 +31,11 @@ public class FactoryGame
         Market = new MarketUI();
     }
 
-    // ÚJ: A StartNewGame most már paramétert vár!
     public void StartNewGame(Difficulty diff)
     {
         GameState.ResetGame(diff);
         Grid.PlacedCards.Clear();
+        // A Marketet hozzáadjuk a Gridhez, így a collision check (ütközésvizsgálat) látni fogja!
         Card marketCard = new Card("MARKET", 25, 25, Color.Gold) { WidthSlots = 2, HeightSlots = 2 };
         Grid.AddCard(marketCard);
         Camera.Target = new Vector2(25 * 240 + 240, 25 * 320 + 320); 
@@ -49,7 +49,7 @@ public class FactoryGame
         GameSaveData data = JsonSerializer.Deserialize<GameSaveData>(json);
         
         if (data != null) {
-            GameState.CurrentDifficulty = (Difficulty)data.Difficulty; // Nehézség betöltése
+            GameState.CurrentDifficulty = (Difficulty)data.Difficulty;
             GameState.Credits = data.Credits; GameState.CurrentQuestIndex = data.QuestIndex;
             GameState.Inventory = data.Inventory; GameState.GlobalUnlocks = data.Unlocks;
             Editor.GlobalUnlocks = GameState.GlobalUnlocks; 
@@ -94,6 +94,26 @@ public class FactoryGame
         }
         return null;
     }
+
+    // --- ÚJ FÜGGVÉNY: Ellenőrzi, hogy szabad-e a hely ---
+    private bool IsAreaClear(int targetX, int targetY, int width, int height, Card ignoreCard)
+    {
+        foreach (var card in Grid.PlacedCards)
+        {
+            if (card == ignoreCard) continue; // Saját magával ne ütközzön
+
+            // Grid alapú téglalap ütközés (AABB)
+            bool collisionX = targetX < card.GridX + card.WidthSlots && targetX + width > card.GridX;
+            bool collisionY = targetY < card.GridY + card.HeightSlots && targetY + height > card.GridY;
+
+            if (collisionX && collisionY)
+            {
+                return false; // Foglalt a hely!
+            }
+        }
+        return true; // Szabad a hely
+    }
+    // ----------------------------------------------------
 
     public void Update()
     {
@@ -187,23 +207,23 @@ public class FactoryGame
 
             Card? hoveredCard = GetCardAtPoint(mouseWorld);
 
-            // TÖRLÉS - VISSZATÉRÍTÉS A NEHÉZSÉG ALAPJÁN
+            // TÖRLÉS
             if (Raylib.IsKeyPressed(KeyboardKey.Delete) || Raylib.IsKeyPressed(KeyboardKey.Backspace)) {
                 if (hoveredCard != null && hoveredCard.Name != "MARKET") {
                     foreach (var bp in GameState.Blueprints) if (bp.Name == hoveredCard.Name) {
-                        int cost = (int)(bp.Cost * GameState.CostMultiplier); // Kalkulált ár visszatérítése
+                        int cost = (int)(bp.Cost * GameState.CostMultiplier);
                         GameState.Credits += cost;
                     }
                     Grid.PlacedCards.Remove(hoveredCard);
                 }
             }
 
-            // VÁSÁRLÁS - NEHÉZSÉG ALAPJÁN
+            // VÁSÁRLÁS
             if (isMouseOnUI && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
                 for (int i = 0; i < GameState.Blueprints.Count; i++) {
                     if (Raylib.CheckCollisionPointRec(mouseScreen, new Rectangle(screenW - 240, 110 + (i * 90), 230, 70))) {
                         var bp = GameState.Blueprints[i];
-                        int actualCost = (int)(bp.Cost * GameState.CostMultiplier); // <--- ITT A LÉNYEG!
+                        int actualCost = (int)(bp.Cost * GameState.CostMultiplier);
 
                         if (GameState.Credits >= actualCost) {
                             GameState.Credits -= actualCost;
@@ -219,7 +239,7 @@ public class FactoryGame
             else if (!isMouseOnUI && Raylib.IsMouseButtonPressed(MouseButton.Left)) {
                 if (hoveredCard != null && hoveredCard.Name != "MARKET") {
                     int baseCost = 0; foreach(var bp in GameState.Blueprints) if(bp.Name==hoveredCard.Name) baseCost=bp.Cost;
-                    int actualCost = (int)(baseCost * GameState.CostMultiplier); // <--- KLÓNOZÁSNÁL IS!
+                    int actualCost = (int)(baseCost * GameState.CostMultiplier);
 
                     bool ctrl = Raylib.IsKeyDown(KeyboardKey.LeftControl);
 
@@ -237,8 +257,18 @@ public class FactoryGame
                 }
             }
 
+            // LERAKÁS ELLENŐRZÉSE (JAVÍTOTT RÉSZ)
             if (Raylib.IsMouseButtonReleased(MouseButton.Left) && draggedCard != null) {
-                var (x, y) = Grid.GetGridPos(mouseWorld.X, mouseWorld.Y); draggedCard.GridX = x; draggedCard.GridY = y; draggedCard = null;
+                var (x, y) = Grid.GetGridPos(mouseWorld.X, mouseWorld.Y); 
+                
+                // CSAK AKKOR RAKJUK LE, HA ÜRES A HELY
+                if (IsAreaClear(x, y, draggedCard.WidthSlots, draggedCard.HeightSlots, draggedCard))
+                {
+                    draggedCard.GridX = x; 
+                    draggedCard.GridY = y; 
+                    draggedCard = null;
+                }
+                // Ha nem üres, a draggedCard nem lesz null, így a játékos "fogva tartja" tovább.
             }
 
             if (!isMouseOnUI && draggedCard == null && Raylib.IsMouseButtonPressed(MouseButton.Right)) {
@@ -261,11 +291,22 @@ public class FactoryGame
         else {
             Raylib.BeginMode2D(Camera);
             Grid.Draw(draggedCard);
+            
+            // SZELLEM KÉP KIRAJZOLÁSA VIZSGÁLATTAL
             if (draggedCard != null) {
                 Vector2 mouseWorld = Raylib.GetScreenToWorld2D(Raylib.GetMousePosition(), Camera);
+                
+                // Kiszámoljuk a leendő pozíciót a színezéshez
+                var (gx, gy) = Grid.GetGridPos(mouseWorld.X, mouseWorld.Y);
+                bool valid = IsAreaClear(gx, gy, draggedCard.WidthSlots, draggedCard.HeightSlots, draggedCard);
+                
+                Color ghostBorderColor = valid ? Color.White : Color.Red; // Ha foglalt, legyen PIROS
+
                 Rectangle ghost = new Rectangle(mouseWorld.X - dragOffset.X, mouseWorld.Y - dragOffset.Y, Grid.CardWidth - 20, Grid.CardHeight - 20);
                 Raylib.DrawRectangleRounded(ghost, 0.05f, 10, new Color((int)draggedCard.HeaderColor.R, (int)draggedCard.HeaderColor.G, (int)draggedCard.HeaderColor.B, 150));
-                Raylib.DrawRectangleRoundedLines(ghost, 0.05f, 10, Color.White);
+                
+                // Itt használjuk a dinamikus színt:
+                Raylib.DrawRectangleRoundedLines(ghost, 0.05f, 10, ghostBorderColor);
             }
             Raylib.EndMode2D();
 
